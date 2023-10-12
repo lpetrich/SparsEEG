@@ -5,11 +5,13 @@ from typing import Sequence, Callable
 from abc import ABC, abstractmethod
 from clu import metrics
 
-class MetricsCollection(ABC,metrics.Collection):
+
+class MetricsCollection(ABC, metrics.Collection):
     pass
 
     def keys(self):
         return [metric for metric, _ in self.compute().items()]
+
 
 ####################################################################
 # Adapted from https://flax.readthedocs.io/en/latest/getting_started.html

@@ -3,6 +3,7 @@ import jax
 import approximator
 import optax
 
+
 def model(type_, seed, ds, *args, **kwargs):
     init_key = jax.random.key(seed)
     if type_.lower() == "densemlp":

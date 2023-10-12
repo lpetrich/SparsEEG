@@ -4,6 +4,7 @@ from torch.utils.data import DataLoader
 from data.dataset import *
 import torch.utils.data as data
 
+
 ####################################################################
 # Taken from https://jax.readthedocs.io/en/latest/notebooks/
 # Neural_Network_and_Data_Loading.html#data-loading-with-pytorch
@@ -12,6 +13,7 @@ def numpy_collate(batch):
     return jax.tree_util.tree_map(
         np.asarray, data.default_collate(batch),
     )
+
 
 class NumpyLoader(DataLoader):
     def __init__(
@@ -28,6 +30,7 @@ class NumpyLoader(DataLoader):
         )
 ####################################################################
 
+
 def setup(ds, *args, **kwargs):
     if isinstance(ds, ClassifierDataset):
         return NumpyLoader(ds, *args, **kwargs)
@@ -35,4 +38,3 @@ def setup(ds, *args, **kwargs):
         raise NotImplementedError(
             f"No DataLoader implemented for Dataset of type {type(ds)}",
         )
-

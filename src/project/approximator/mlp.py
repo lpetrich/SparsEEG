@@ -1,6 +1,7 @@
 from flax import linen as nn
 from typing import Sequence, Callable
 
+
 class MLP(nn.Module):
     features: Sequence[int]
     act: Sequence[Callable]
@@ -18,4 +19,3 @@ class MLP(nn.Module):
             x = l(x)
             x = self.act[i](x)
         return x
-

@@ -15,10 +15,11 @@ import training.state as training_state
 import torch
 import util.construct as construct
 
+
 def get_data(dataset_config, seed):
     train_ds, test_ds = dataset.load(dataset_config["type"], seed)
 
-    torch.manual_seed(seed) # Needed to seed the shuffling procedure
+    torch.manual_seed(seed)  # Needed to seed the shuffling procedure
     batch_size = dataset_config["batch_size"]
     shuffle = dataset_config["shuffle"]
     train_dl = loader.setup(train_ds, batch_size=batch_size, shuffle=shuffle)
@@ -34,6 +35,7 @@ def get_data(dataset_config, seed):
 class Metrics(training_state.MetricsCollection):
     accuracy: metrics.Accuracy
     loss: metrics.Average.from_output("loss")
+
 
 @jit
 def compute_metrics(*, state, batch):
@@ -69,7 +71,7 @@ def default_config():
         },
         'seed': 1,
         'epochs': 10,
-     }
+    }
 
 
 def working_experiment():

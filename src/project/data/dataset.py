@@ -3,6 +3,7 @@ import numpy as np
 import jax.numpy as jnp
 from torch.utils.data import Dataset
 
+
 class ClassifierDataset(Dataset):
     def __init__(self, rng, n_samples, x_dim, n_classes, W, b):
         if W is None:

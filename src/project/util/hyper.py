@@ -1,6 +1,7 @@
 import yaml
 import pprint
 
+
 def sweeps(config, index):
     out = {}
     accum = _sweeps(config, 1, out, 1)
@@ -22,7 +23,7 @@ def _sweeps(config, index, out, accum):
             accum = _sweeps(config[key], index, out[key], accum)
         elif isinstance(config[key], list) and len(config[key]) > 0:
             num = len(config[key])
-            out[key] = config[key][(index//accum) % num]
+            out[key] = config[key][(index // accum) % num]
             accum *= num
         else:
             num = 1
