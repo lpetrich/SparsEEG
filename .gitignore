@@ -1,5 +1,10 @@
+# Vim files
+.tags
+*.un~
+*.swp
+
 # Project folders
-data/
+results/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
