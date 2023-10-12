@@ -3,6 +3,7 @@ import jax.numpy as jnp
 from torch.utils.data import DataLoader
 from src.project.data.dataset import *
 import torch.utils.data as data
+from sklearn.model_selection import StratifiedKFold
 
 
 ####################################################################

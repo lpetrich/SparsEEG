@@ -14,16 +14,38 @@ import flax.linen as nn
 import src.project.training.state as training_state
 import torch
 import src.project.util.construct as construct
+from sklearn.model_selection import StratifiedKFold
+from math import gcd
+import warnings
 
 
-def get_data(dataset_config, seed):
-    train_ds, test_ds = dataset.load(dataset_config["type"], seed)
+def get_data(dataset_config, seed, n_folds, fold):
+    ds = dataset.load(dataset_config["type"], seed)
+
+    train_ds, test_ds = ds.stratify_kfold(n_folds, fold)
 
     torch.manual_seed(seed)  # Needed to seed the shuffling procedure
     batch_size = dataset_config["batch_size"]
     shuffle = dataset_config["shuffle"]
+
+    if len(train_ds) % batch_size != 0:
+        old_batch_size = batch_size
+        batch_size = gcd(batch_size, len(train_ds))
+        print("\033[33m")
+        warnings.warn(
+            f"number of samples {len(train_ds)} is not divisible by " +
+            f"batch size {old_batch_size}, using batch size {batch_size} " +
+            "instead",
+        )
+        print("\033[0m")
+
     train_dl = loader.setup(train_ds, batch_size=batch_size, shuffle=shuffle)
-    test_dl = loader.setup(test_ds, batch_size=batch_size, shuffle=shuffle)
+
+    # Test batch size is always the entire test set
+    test_batch_size = len(test_ds)
+    test_dl = loader.setup(
+        test_ds, batch_size=test_batch_size, shuffle=shuffle,
+    )
 
     return train_ds, test_ds, train_dl, test_dl
 
@@ -83,7 +105,9 @@ def main_experiment(config):
 
     # Get the dataset
     dataset_config = config["dataset"]
-    train_ds, test_ds, train_dl, test_dl = get_data(dataset_config, seed)
+    train_ds, test_ds, train_dl, test_dl = get_data(
+        dataset_config, seed, 8, 4,
+    )
 
     # Construct the model
     model_config = config["model"]
