@@ -8,12 +8,12 @@ import optax
 import jax.numpy as jnp
 import jax
 from jax import jit
-import data.dataset as dataset
-import data.loader as loader
+import src.project.data.dataset as dataset
+import src.project.data.loader as loader
 import flax.linen as nn
-import training.state as training_state
+import src.project.training.state as training_state
 import torch
-import util.construct as construct
+import src.project.util.construct as construct
 
 
 def get_data(dataset_config, seed):

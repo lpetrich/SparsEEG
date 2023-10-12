@@ -1,6 +1,6 @@
 import flax.linen as nn
 import jax
-import approximator
+import src.project.approximator as approximator
 import optax
 
 

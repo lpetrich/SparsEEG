@@ -1,2 +1,2 @@
-from approximator.mlp import *
-from approximator.activation import *
+from src.project.approximator.mlp import *
+from src.project.approximator.activation import *

@@ -1,7 +1,7 @@
 import jax
 import jax.numpy as jnp
 from torch.utils.data import DataLoader
-from data.dataset import *
+from src.project.data.dataset import *
 import torch.utils.data as data
 
 
