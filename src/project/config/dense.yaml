@@ -1,12 +1,16 @@
-epochs: 1
-seed: 2
+n_internal_folds: 2
+n_external_folds: 3
+epochs: 200
+seed: 1
 dataset:
-  type: "ClassifierDataset-Default"
-  batch_size: 10
-  shuffle: true
+  type: "WineDataset"
+  internal_batch_size: 0
+  external_batch_size: 0
+  shuffle_internal: true
+  shuffle_external: true
 model:
   type: "DenseMLP"
-  hidden_layers: [[64, 64], [12, 12]]
+  hidden_layers: [[64, 64], [128, 128]]
   activations: [["relu", "relu"]]
   optim:
     type: "adam"

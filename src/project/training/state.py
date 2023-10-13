@@ -17,6 +17,10 @@ class MetricsCollection(ABC, metrics.Collection):
 # Adapted from https://flax.readthedocs.io/en/latest/getting_started.html
 ####################################################################
 class TrainState(train_state.TrainState):
+    """
+    Initializes model parameters and tracks optimizer state, model
+    state/parameters, and metrics to store during training
+    """
     metrics: MetricsCollection
 
 

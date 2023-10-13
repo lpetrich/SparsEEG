@@ -2,50 +2,36 @@ import jax
 import numpy as np
 import jax.numpy as jnp
 from torch.utils.data import Dataset
-from sklearn.model_selection import StratifiedKFold
+import sklearn.model_selection as model_selection
+from sklearn.datasets import load_wine
 from copy import deepcopy
+from abc import ABC, abstractmethod
 
 
-class ClassifierDataset(Dataset):
-    def __init__(self, rng, n_samples, x_dim, n_classes, W, b):
-        if W is None:
-            rng, w_key = jax.random.split(rng)
-            W = jax.random.normal(w_key, (x_dim, n_classes))
-        if b is None:
-            rng, b_key = jax.random.split(rng)
-            b = jax.random.normal(b_key, (n_classes,))
+class DatasetSplitter(ABC):
+    def __init__(self):
+        pass
 
-        self._W = W
-        self._b = b
-        self._n_classes = n_classes
+    @abstractmethod
+    def split(self, fold):
+        pass
 
-        key, key_sample, key_noise = jax.random.split(rng, 3)
-        x_samples = jax.random.normal(key_sample, (n_samples, x_dim))
 
-        # Y ~ Multinoulli(π = softmax(Wᵀx))
-        y_samples = jax.random.categorical(
-            key_noise, jnp.dot(x_samples, W), axis=-1,
-        )
+class StratifiedKFold(DatasetSplitter):
+    def __init__(self, dataset, n_folds):
+        self.n_folds = n_folds
+        self.dataset = dataset
 
-        self.x_samples = np.array(x_samples)
-        self.y_samples = np.array(y_samples)
+    def split(self, fold):
+        skf = model_selection.StratifiedKFold(n_splits=self.n_folds)
+        return self._split(skf, fold)
 
-    def __len__(self):
-        return self.n_samples
-
-    def __getitem__(self, index):
-        return (
-            np.array(self.x_samples[index]),
-            np.array(self.y_samples[index]),
-        )
-
-    def stratify_kfold(self, n_folds, fold):
-        train = deepcopy(self)
-        test = deepcopy(self)
+    def _split(self, kf, fold):
+        train = deepcopy(self.dataset)
+        test = deepcopy(self.dataset)
 
         # Create the stratified splits
-        skf = StratifiedKFold(n_splits=n_folds)
-        splits = skf.split(self.data[0], self.data[1])
+        splits = kf.split(self.dataset.data[0], self.dataset.data[1])
         train_indices = []
         test_indices = []
         for fold_num, (train_ind, test_ind) in enumerate(splits):
@@ -58,8 +44,6 @@ class ClassifierDataset(Dataset):
         # Create the new training set
         train_x_samples = train.x_samples[np.array(train_indices), :][0]
         train_y_samples = train.y_samples[train_indices][0]
-        print(train_x_samples.shape)
-        print(train.x_samples.shape)
         train.data = (train_x_samples, train_y_samples)
 
         # Create the new testing set
@@ -68,6 +52,73 @@ class ClassifierDataset(Dataset):
         test.data = (test_x_samples, test_y_samples)
 
         return train, test
+
+
+class WineDataset(Dataset):
+    def __init__(self):
+        data = load_wine()
+        self.x_samples = data["data"]
+        self.y_samples = data["target"]
+        self._n_classes = 3
+
+    def __len__(self):
+        return len(self.y_samples)
+
+    def __getitem__(self, index):
+        return (
+            self.x_samples[index, :],
+            self.y_samples[index],
+        )
+
+    @property
+    def n_samples(self):
+        return len(self)
+
+    @property
+    def data(self):
+        return (self.x_samples, self.y_samples)
+
+    @data.setter
+    def data(self, data):
+        self.x_samples = data[0]
+        self.y_samples = data[1]
+
+    @property
+    def n_classes(self):
+        return self._n_classes
+
+
+class ClassifierDataset(Dataset):
+    def __init__(self, rng, n_samples, x_dim, n_classes):
+        self._n_classes = n_classes
+
+        key, key_sample, key_noise = jax.random.split(rng, 3)
+        x_samples = jax.random.normal(key_sample, (n_samples, x_dim))
+        x_samples = np.array(x_samples)
+
+        # Two populations:
+        #   𝒩([1, 1], [1, 1])           Label: 0
+        #   𝒩([0, 0], [0.75, 0.25])     Label: 1
+        x_samples[:len(x_samples) // 2, :] += 1
+        x_samples[len(x_samples) // 2:, 0] *= 0.75
+        x_samples[len(x_samples) // 2:, 1] *= 0.25
+
+        # Y ~ Multinoulli(π = softmax(Wᵀx))
+        y_samples = np.zeros(x_samples.shape[0], dtype=np.int)
+        y_samples[:len(y_samples) // 2] = 0
+        y_samples[len(y_samples) // 2:] = 1
+
+        self.x_samples = x_samples
+        self.y_samples = np.array(y_samples)
+
+    def __len__(self):
+        return self.n_samples
+
+    def __getitem__(self, index):
+        return (
+            np.array(self.x_samples[index]),
+            np.array(self.y_samples[index]),
+        )
 
     @property
     def n_samples(self):
@@ -85,14 +136,6 @@ class ClassifierDataset(Dataset):
     @property
     def n_classes(self):
         return self._n_classes
-
-    @property
-    def W(self):
-        return self._W
-
-    @property
-    def b(self):
-        return self._b
 
 
 # Load a full dataset with pre-defined train/test splits
@@ -121,13 +164,14 @@ def load_train_test(identifier: str, seed):
 # Load a full dataset
 def load(identifier: str, seed):
     train_init_rng = jax.random.key(seed)
+    identifier = identifier.lower()
 
-    if identifier.lower() == "classifierdataset-default":
+    if identifier == "classifierdataset-default":
         x_dim = 10
-        n_classes = 5
-        train_ds = ClassifierDataset(
-            train_init_rng, 120, x_dim, n_classes, None, None,
-        )
+        n_classes = 3
+        train_ds = ClassifierDataset(train_init_rng, 200, x_dim, n_classes)
+    elif identifier == "winedataset":
+        train_ds = WineDataset()
     else:
         raise NotImplementedError(f"{identifier} does not exist")
 

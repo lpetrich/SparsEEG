@@ -1,3 +1,4 @@
+from copy import deepcopy
 import flax.linen as nn
 import jax
 import src.project.approximator as approximator
@@ -41,6 +42,10 @@ def _get_activation(act: str, kwargs={}):
 def _construct_dense_mlp(
     init_key, ds, hidden_sizes, activations, weight_init
 ):
+    # Deepcopy parameters to avoid silent mutations later
+    activations = deepcopy(activations)
+    hidden_sizes = deepcopy(hidden_sizes)
+
     assert len(hidden_sizes) == len(activations)
     x = ds[0][0]
 
@@ -55,9 +60,8 @@ def _construct_dense_mlp(
         act=activations,
         weight_init=weight_init,
     )
-    params = model.init(init_key, x)
 
-    return model, params
+    return model
 
 
 # For parameters that each type of optimiser expects, see

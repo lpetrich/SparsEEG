@@ -1,6 +1,6 @@
 # Eventually, this will be made into an experiment in the experiments/
 # direcotory, and we can use Andy's code to schedule
-import pprint
+import numpy as np
 import yaml
 from clu import metrics
 from flax import struct
@@ -14,40 +14,15 @@ import flax.linen as nn
 import src.project.training.state as training_state
 import torch
 import src.project.util.construct as construct
-from sklearn.model_selection import StratifiedKFold
 from math import gcd
 import warnings
+from pprint import pprint
+from src.project.training.cross_validation import NestedCrossValidation
+from src.project.training.cross_validation import adjust_batch_size
 
 
-def get_data(dataset_config, seed, n_folds, fold):
-    ds = dataset.load(dataset_config["type"], seed)
-
-    train_ds, test_ds = ds.stratify_kfold(n_folds, fold)
-
-    torch.manual_seed(seed)  # Needed to seed the shuffling procedure
-    batch_size = dataset_config["batch_size"]
-    shuffle = dataset_config["shuffle"]
-
-    if len(train_ds) % batch_size != 0:
-        old_batch_size = batch_size
-        batch_size = gcd(batch_size, len(train_ds))
-        print("\033[33m")
-        warnings.warn(
-            f"number of samples {len(train_ds)} is not divisible by " +
-            f"batch size {old_batch_size}, using batch size {batch_size} " +
-            "instead",
-        )
-        print("\033[0m")
-
-    train_dl = loader.setup(train_ds, batch_size=batch_size, shuffle=shuffle)
-
-    # Test batch size is always the entire test set
-    test_batch_size = len(test_ds)
-    test_dl = loader.setup(
-        test_ds, batch_size=test_batch_size, shuffle=shuffle,
-    )
-
-    return train_ds, test_ds, train_dl, test_dl
+def get_data(identifier, seed):
+    return dataset.load(identifier, seed)
 
 
 ####################################################################
@@ -56,7 +31,8 @@ def get_data(dataset_config, seed, n_folds, fold):
 @struct.dataclass
 class Metrics(training_state.MetricsCollection):
     accuracy: metrics.Accuracy
-    loss: metrics.Average.from_output("loss")
+    loss_mean: metrics.Average.from_output("loss")
+    loss_std: metrics.Std.from_output("loss")
 
 
 @jit
@@ -97,35 +73,61 @@ def default_config():
 
 
 def working_experiment():
-    return main_experiment(default_config())
+    return main_experiment(default_config(), verbose=True)
 
 
-def main_experiment(config):
+def main_experiment(config, verbose=False):
     seed = config["seed"]
+    torch.manual_seed(seed)  # Needed to seed the shuffling procedure
 
-    # Get the dataset
+    epochs = config["epochs"]
+
+    n_external_folds = config["n_external_folds"]
+    n_internal_folds = config["n_internal_folds"]
+
     dataset_config = config["dataset"]
-    train_ds, test_ds, train_dl, test_dl = get_data(
-        dataset_config, seed, 8, 4,
-    )
+    external_batch_size = dataset_config["external_batch_size"]
+    internal_batch_size = dataset_config["internal_batch_size"]
+    shuffle_external = dataset_config["shuffle_external"]
+    shuffle_internal = dataset_config["shuffle_internal"]
 
-    # Construct the model
+    # Get model parameters
     model_config = config["model"]
     model_type = model_config["type"]
     hidden_layers = model_config["hidden_layers"]
     activations = model_config["activations"]
-    model, params = construct.model(
-        model_type, seed, train_ds, hidden_layers, activations,
-        jax.nn.initializers.glorot_normal(),
-    )
 
-    # Construct the optimiser
+    # Get optimiser parameters
     optim_config = model_config["optim"]
     opt_type = optim_config["type"]
     opt_args = optim_config["args"]
     opt_kwargs = optim_config["kwargs"]
-    optim = construct.optim(opt_type, opt_args, opt_kwargs)
 
+    def model_fn(seed, train_ds):
+        return construct.model(
+            model_type, seed, train_ds, hidden_layers, activations,
+            jax.nn.initializers.glorot_normal(), # TODO: get from config
+        )
+
+    def optim_fn():
+        return construct.optim(opt_type, opt_args, opt_kwargs)
+
+    dataset_name = dataset_config["type"]
+    dataset_fn = lambda seed: get_data(dataset_name, seed)
+
+    cv = NestedCrossValidation(
+        experiment_loop, model_fn, optim_fn, n_external_folds,
+        n_internal_folds, dataset_fn, external_batch_size, internal_batch_size,
+        shuffle_external, shuffle_internal, dataset.StratifiedKFold
+    )
+
+    return cv.run(seed, epochs, verbose)
+
+
+def experiment_loop(
+    seed, epochs, model, optim, train_ds, train_dl, test_ds, test_dl,
+    verbose=False,
+):
     # Construct the training state
     init_rng = jax.random.key(seed)
     state = training_state.create(
@@ -133,17 +135,16 @@ def main_experiment(config):
     )
     del init_rng
 
-    epochs = config["epochs"]
-    data = experiment_loop(epochs, state, train_dl, test_dl)
-
-    return data
-
-
-def experiment_loop(epochs, state, train_dl, test_dl):
     metrics_history = {}
     for key in state.metrics.keys():
         metrics_history[f"train_{key}"] = []
         metrics_history[f"test_{key}"] = []
+
+    data = {}
+    for type_ in ("train", "test"):
+        for metric in state.metrics.keys():
+            key = f"{type_}_{metric}"
+            data[key] = []
 
     for epoch in range(epochs):
         # Train for one epoch
@@ -169,18 +170,17 @@ def experiment_loop(epochs, state, train_dl, test_dl):
                 metrics_history[f"test_{metric}"].append(value)
 
         # Print data at the end of the epoch
-        print(f"==> Epoch {epoch}:")
+        if verbose:
+            print(f"==> Epoch {epoch}:")
         for type_ in ("train", "test"):
             for metric in state.metrics.keys():
                 key = f"{type_}_{metric}"
                 value = metrics_history[key][-1]
-                print(f"\t{type_.title()} {metric.title()}:\t {value:.3f}")
 
-    return {}
+                if verbose:
+                    print(f"\t{type_.title()} {metric.title()}:\t {value:.3f}")
 
-# config_file = "config/dense.yaml"
-# with open(config_file, "r") as infile:
-#     config = yaml.safe_load(infile)
-# main_experiment(config)
+                data[key].append(value.item())
 
-# working_experiment()
+    return data
+

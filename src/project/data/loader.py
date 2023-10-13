@@ -35,6 +35,8 @@ class NumpyLoader(DataLoader):
 def setup(ds, *args, **kwargs):
     if isinstance(ds, ClassifierDataset):
         return NumpyLoader(ds, *args, **kwargs)
+    if isinstance(ds, WineDataset):
+        return NumpyLoader(ds, *args, **kwargs)
     else:
         raise NotImplementedError(
             f"No DataLoader implemented for Dataset of type {type(ds)}",
