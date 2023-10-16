@@ -76,8 +76,6 @@ def optim(type_: str, config: dict):
         return None, _optim_optax(type_, config)
     elif type_ in ("set"):
         sparsity_updater = _optim_jaxpruner(type_, config)
-        # TODO: assign sparsity scheduler... right now it doesn't run I don't
-        # think
 
         wrapped_config = config["wrapped"]
         wrapped_type = wrapped_config["type"].lower()
@@ -94,11 +92,13 @@ def _optim_jaxpruner(type_: str, config: dict):
         args = config["args"]
         kwargs = config["kwargs"]
 
-        # SET prunes after each epoch
+        # Create the sparsity distribution
         dist_config = kwargs["sparsity_distribution_fn"]
         kwargs["sparsity_distribution_fn"] = _jaxpruner_sparsity_dist(
             dist_config,
         )
+
+        # Create the schedule at which we induce sparsity
         schedule_config = kwargs["scheduler"]
         kwargs["scheduler"] = _jaxpruner_scheduler(schedule_config)
 
@@ -106,6 +106,32 @@ def _optim_jaxpruner(type_: str, config: dict):
             kwargs["drop_fraction_fn"] = eval(kwargs["drop_fraction_fn"])
 
         return jaxpruner.SET(*args, **kwargs)
+
+    elif type_ == "magnitudepruning":
+        # Create the sparsity distribution
+        dist_config = kwargs["sparsity_distribution_fn"]
+        kwargs["sparsity_distribution_fn"] = _jaxpruner_sparsity_dist(
+            dist_config,
+        )
+
+        # Create the schedule at which we induce sparsity
+        schedule_config = kwargs["scheduler"]
+        kwargs["scheduler"] = _jaxpruner_scheduler(schedule_config)
+
+        return jaxpruner.MagnitudePruning(*args, **kwargs)
+
+    elif type_ == "randompruning":
+        # Create the sparsity distribution
+        dist_config = kwargs["sparsity_distribution_fn"]
+        kwargs["sparsity_distribution_fn"] = _jaxpruner_sparsity_dist(
+            dist_config,
+        )
+
+        # Create the schedule at which we induce sparsity
+        schedule_config = kwargs["scheduler"]
+        kwargs["scheduler"] = _jaxpruner_scheduler(schedule_config)
+
+        return jaxpruner.RandomPruning(*args, **kwargs)
     else:
         raise NotImplementedError(f"sparse optim {type_} not implemented")
 

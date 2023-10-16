@@ -16,7 +16,7 @@ model:
     type: "set"
     args: [[]]
     kwargs:
-      drop_fraction_fn: "lambda _: 0.3"
+      drop_fraction_fn: "lambda _: 0.3" # Number of weights to prune at iter i
       scheduler:
         type: "PeriodicSchedule"
         args: []
@@ -26,7 +26,7 @@ model:
           update_end_step: null
       sparsity_distribution_fn:
         type: "erk"
-        kwargs: {"sparsity": 0.5}
+        kwargs: {"sparsity": 0.5} # Level of sparsity
     wrapped:
       type: "adam"
       args: [[]]

@@ -1,0 +1,30 @@
+n_internal_folds: 2
+n_external_folds: 3
+epochs: 200
+seed: 1
+dataset:
+  type: "WineDataset"
+  internal_batch_size: 0
+  external_batch_size: 0
+  shuffle_internal: true
+  shuffle_external: true
+model:
+  type: "DenseMLP"
+  hidden_layers: [[128, 128], [256, 256]]
+  activations: [["relu", "relu"]]
+  optim:
+    type: "MagnitudePruning"
+    args: [[]]
+    kwargs:
+      scheduler:
+        type: "OneShotSchedule"
+        args: [100]
+        kwargs: {}
+      sparsity_distribution_fn:
+        type: "erk"
+        kwargs: {"sparsity": 0.5}
+    wrapped:
+      type: "adam"
+      args: [[]]
+      kwargs:
+        learning_rate: 0.01
