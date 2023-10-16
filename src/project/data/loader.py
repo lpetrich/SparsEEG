@@ -11,9 +11,7 @@ from sklearn.model_selection import StratifiedKFold
 # Neural_Network_and_Data_Loading.html#data-loading-with-pytorch
 ####################################################################
 def numpy_collate(batch):
-    return jax.tree_util.tree_map(
-        np.asarray, data.default_collate(batch),
-    )
+    return jax.tree_util.tree_map(np.asarray, data.default_collate(batch))
 
 
 class NumpyLoader(DataLoader):
