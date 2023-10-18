@@ -14,12 +14,12 @@ from jax import jit
 # from src.project.training.cross_validation import NestedCrossValidation
 # from src.project.training.cross_validation import adjust_batch_size
 # import src.project.util.construct as construct
-import data.dataset as dataset
-import data.loader as loader
-import training.state as training_state
-from training.cross_validation import NestedCrossValidation
-from training.cross_validation import adjust_batch_size
-import util.construct as construct
+import sparseeg.data.dataset as dataset
+import sparseeg.data.loader as loader
+import sparseeg.training.state as training_state
+from sparseeg.training.cross_validation import NestedCrossValidation
+from sparseeg.training.cross_validation import adjust_batch_size
+import sparseeg.util.construct as construct
 
 import flax.linen as nn
 import torch
