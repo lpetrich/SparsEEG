@@ -1,7 +1,8 @@
 from copy import deepcopy
 import flax.linen as nn
 import jax
-import src.project.approximator as approximator
+# import src.project.approximator as approximator
+import approximator as approximator
 import optax
 
 

@@ -1,9 +1,12 @@
 import numpy as np
 from clu import metrics
 import jax
-import src.project.data.dataset as dataset
-import src.project.data.loader as loader
-import src.project.training.state as training_state
+# import src.project.data.dataset as dataset
+# import src.project.data.loader as loader
+# import src.project.training.state as training_state
+import data.dataset as dataset
+import data.loader as loader
+import training.state as training_state
 import torch
 from math import gcd
 import warnings

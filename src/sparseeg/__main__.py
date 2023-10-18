@@ -7,10 +7,14 @@ You can run this package with
 """
 
 from importlib import import_module
+
+import sparseeg
+
 import click
 import os
 import pickle
-import src.project.util.hyper as hyper
+# import src.project.util.hyper as hyper
+import sparseeg.util.hyper as hyper
 import yaml
 
 
