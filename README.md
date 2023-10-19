@@ -25,20 +25,23 @@ Make sure you have Python3 installed:
 
 **1. Install package dependencies:**
 
-pip install --upgrade pip
+```bash
 pip install --upgrade "jax[cpu]"
+```
+```bash
 pip3 install torch torchvision torchaudio
+```
+```bash
 pip install scikit-learn
-
-Install the latest version of clu:
+```
 ```bash
 !pip install -q git+https://github.com/google/CommonLoopUtils
 ```
 
-**2. Install the package with pip in your terminal:**
+**2. Install the local package with pip IN EDIT MODE in your terminal from the main package folder:**
 
 ```bash
-pip3 install git+https://github.com/IRLL/<project>.git
+python -m pip install -e .
 ```
 
 # Usage
@@ -46,10 +49,7 @@ pip3 install git+https://github.com/IRLL/<project>.git
 **Run the project with the following command:**
 
 ```bash
-python -m <project>
+python -m sparseeg -s "SAVE_DIR" -i "INT" "EXPERIMENT_FILE" "CONFIG_FILE"
 ```
 
-**For testing you can run the main file directly from src/project:**
-```bash
-python3 __main__.py -s "SAVE_DIR" -i "INT" experiment/default.py config/dense.yaml
-```
+
