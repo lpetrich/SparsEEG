@@ -1,7 +1,8 @@
 import jax
 import jax.numpy as jnp
 from torch.utils.data import DataLoader
-from src.project.data.dataset import *
+# from src.project.data.dataset import *
+from data.dataset import *
 import torch.utils.data as data
 from sklearn.model_selection import StratifiedKFold
 
@@ -36,6 +37,8 @@ def setup(ds, *args, **kwargs):
     if isinstance(ds, ClassifierDataset):
         return NumpyLoader(ds, *args, **kwargs)
     if isinstance(ds, WineDataset):
+        return NumpyLoader(ds, *args, **kwargs)
+    if isinstance(ds, WAYEEGGALDataset):
         return NumpyLoader(ds, *args, **kwargs)
     else:
         raise NotImplementedError(

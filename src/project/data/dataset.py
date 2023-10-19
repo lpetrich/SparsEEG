@@ -54,6 +54,41 @@ class StratifiedKFold(DatasetSplitter):
         return train, test
 
 
+class WAYEEGGALDataset(Dataset):
+    def __init__(self):
+        print(f"Loading WAL-EEG-GAL Dataset of type: {Dataset}")
+        data = load_wine()
+        self.x_samples = data["data"]
+        self.y_samples = data["target"]
+        self._n_classes = 3
+
+    def __len__(self):
+        return len(self.y_samples)
+
+    def __getitem__(self, index):
+        return (
+            self.x_samples[index, :],
+            self.y_samples[index],
+        )
+
+    @property
+    def n_samples(self):
+        return len(self)
+
+    @property
+    def data(self):
+        return (self.x_samples, self.y_samples)
+
+    @data.setter
+    def data(self, data):
+        self.x_samples = data[0]
+        self.y_samples = data[1]
+
+    @property
+    def n_classes(self):
+        return self._n_classes
+
+
 class WineDataset(Dataset):
     def __init__(self):
         data = load_wine()
@@ -172,6 +207,9 @@ def load(identifier: str, seed):
         train_ds = ClassifierDataset(train_init_rng, 200, x_dim, n_classes)
     elif identifier == "winedataset":
         train_ds = WineDataset()
+    elif identifier == "wayeeggaldataset":
+        print("Initializing WAY-EEG-GAL Dataset... JK")
+        train_ds = WAYEEGGALDataset()
     else:
         raise NotImplementedError(f"{identifier} does not exist")
 
