@@ -8,12 +8,7 @@ import optax
 import jax.numpy as jnp
 import jax
 from jax import jit
-# import src.project.data.dataset as dataset
-# import src.project.data.loader as loader
-# import src.project.training.state as training_state
-# from src.project.training.cross_validation import NestedCrossValidation
-# from src.project.training.cross_validation import adjust_batch_size
-# import src.project.util.construct as construct
+
 import sparseeg.data.dataset as dataset
 import sparseeg.data.loader as loader
 import sparseeg.training.state as training_state
