@@ -4,6 +4,7 @@ import jax.numpy as jnp
 from torch.utils.data import Dataset
 import sklearn.model_selection as model_selection
 from sklearn.datasets import load_wine
+from sparseeg.data.csv_loader import load_wayeeggal
 from copy import deepcopy
 from abc import ABC, abstractmethod
 
@@ -56,11 +57,19 @@ class StratifiedKFold(DatasetSplitter):
 
 class WAYEEGGALDataset(Dataset):
     def __init__(self):
-        print(f"Loading WAL-EEG-GAL Dataset of type: {Dataset}")
-        data = load_wine()
+        print(f"Initializing WAL-EEG-GAL Dataset of type: {Dataset}")
+        # this will return all series for one subject
+        # TODO: add subject to config file?
+        subject = 1
+        data = load_wayeeggal(subject=subject, train=True)
         self.x_samples = data["data"]
         self.y_samples = data["target"]
-        self._n_classes = 3
+        self._n_classes = 12
+        print(f"Number of x samples: {self.x_samples.shape}")
+        print(f"Number of y samples: {self.y_samples.shape}")
+        print(f"Number of classes: {self._n_classes}")
+        print(f"Target names: {data['target_names']}")
+        print(f"Feature names: {data['feature_names']}")
 
     def __len__(self):
         return len(self.y_samples)
@@ -208,7 +217,6 @@ def load(identifier: str, seed):
     elif identifier == "winedataset":
         train_ds = WineDataset()
     elif identifier == "wayeeggaldataset":
-        print("Initializing WAY-EEG-GAL Dataset... JK")
         train_ds = WAYEEGGALDataset()
     else:
         raise NotImplementedError(f"{identifier} does not exist")

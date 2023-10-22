@@ -37,6 +37,8 @@ def setup(ds, *args, **kwargs):
         return NumpyLoader(ds, *args, **kwargs)
     if isinstance(ds, WineDataset):
         return NumpyLoader(ds, *args, **kwargs)
+    if isinstance(ds, WAYEEGGALDataset):
+        return NumpyLoader(ds, *args, **kwargs)
     else:
         raise NotImplementedError(
             f"No DataLoader implemented for Dataset of type {type(ds)}",
