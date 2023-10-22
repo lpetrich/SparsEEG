@@ -38,6 +38,7 @@ def butter_highpass(highcut, fs, order):
 
 def get_path(subject, series, kind, train):
 	# adapted from https://github.com/bitsofbits/kaggle_grasp_and_lift_eeg_detection/blob/master/code/grasp.py
+	# Note: this requires the csv series files to be located in the test and train folders along this specific path
 	prefix = "./src/sparseeg/dataset/train" if train else "./src/sparseeg/dataset/test"
 	return "{0}/subj{1}_series{2}_{3}.csv".format(prefix, subject, series, kind)
 

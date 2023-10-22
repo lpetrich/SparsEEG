@@ -44,6 +44,10 @@ pip install scikit-learn
 python -m pip install -e .
 ```
 
+**3. Download the dataset files and unzip into the src/sparseeg folder:**
+https://drive.google.com/file/d/1f49lJ2fuja27wC-ze8o6CC3O1ENMzbMJ/view?usp=share_link
+
+
 # Usage
 
 **Run the project with the following command:**
