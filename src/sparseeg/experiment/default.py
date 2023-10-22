@@ -8,26 +8,19 @@ import optax
 import jax.numpy as jnp
 import jax
 from jax import jit
+
+import sparseeg.data.dataset as dataset
+import sparseeg.data.loader as loader
+import sparseeg.training.state as training_state
+from sparseeg.training.cross_validation import NestedCrossValidation
+from sparseeg.training.cross_validation import adjust_batch_size
+import sparseeg.util.construct as construct
+
 import flax.linen as nn
 import torch
 from math import gcd
 import warnings
 from pprint import pprint
-
-# import src.project.data.dataset as dataset
-# import src.project.data.loader as loader
-# import src.project.training.state as training_state
-# import src.project.util.construct as construct
-# from src.project.training.cross_validation import NestedCrossValidation
-# from src.project.training.cross_validation import adjust_batch_size
-import data.dataset as dataset
-import data.loader as loader
-import training.state as training_state
-import util.construct as construct
-from training.cross_validation import NestedCrossValidation
-from training.cross_validation import adjust_batch_size
-
-
 
 def get_data(identifier, seed):
     return dataset.load(identifier, seed)
