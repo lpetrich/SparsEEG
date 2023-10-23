@@ -58,11 +58,11 @@ def getJobScript(parallel, num_gpu):
 {gpus}
 
 cd {cwd}
-module load python/3.9
+module load python/3.10
 module load cuda
 module load cudnn/8.0.3
 
-source ~/py3_9/bin/activate
+source ~/py3_10/bin/activate
 
 export MPLBACKEND=TKAgg
 export OMP_NUM_THREADS=1
