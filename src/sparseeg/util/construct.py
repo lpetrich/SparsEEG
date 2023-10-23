@@ -1,8 +1,12 @@
+from functools import partial
+from pprint import pprint
 from copy import deepcopy
 import flax.linen as nn
 import jax
 import sparseeg.approximator as approximator
+import jaxpruner
 import optax
+import warnings
 
 
 def model(type_, seed, ds, *args, **kwargs):
@@ -64,9 +68,110 @@ def _construct_dense_mlp(
     return model
 
 
+# Returns (sparsity wrapper, optimiser)
+def optim(type_: str, config: dict):
+    type_ = type_.lower()
+
+    if type_ in ("adam", "rmsprop", "adagrad", "sgd"):
+        return None, _optim_optax(type_, config)
+    elif type_ in ("set"):
+        sparsity_updater = _optim_jaxpruner(type_, config)
+
+        wrapped_config = config["wrapped"]
+        wrapped_type = wrapped_config["type"].lower()
+        wrapped = _optim_optax(wrapped_type, wrapped_config)
+
+        return sparsity_updater, sparsity_updater.wrap_optax(wrapped)
+    else:
+        raise NotImplementedError(f"optim {type_} not implemented")
+
+
+def _optim_jaxpruner(type_: str, config: dict):
+    config = deepcopy(config)  # To avoid silent mutations
+    if type_ == "set":
+        args = config["args"]
+        kwargs = config["kwargs"]
+
+        # Create the sparsity distribution
+        dist_config = kwargs["sparsity_distribution_fn"]
+        kwargs["sparsity_distribution_fn"] = _jaxpruner_sparsity_dist(
+            dist_config,
+        )
+
+        # Create the schedule at which we induce sparsity
+        schedule_config = kwargs["scheduler"]
+        kwargs["scheduler"] = _jaxpruner_scheduler(schedule_config)
+
+        if "drop_fraction_fn" in kwargs.keys():
+            kwargs["drop_fraction_fn"] = eval(kwargs["drop_fraction_fn"])
+
+        return jaxpruner.SET(*args, **kwargs)
+
+    elif type_ == "magnitudepruning":
+        # Create the sparsity distribution
+        dist_config = kwargs["sparsity_distribution_fn"]
+        kwargs["sparsity_distribution_fn"] = _jaxpruner_sparsity_dist(
+            dist_config,
+        )
+
+        # Create the schedule at which we induce sparsity
+        schedule_config = kwargs["scheduler"]
+        kwargs["scheduler"] = _jaxpruner_scheduler(schedule_config)
+
+        return jaxpruner.MagnitudePruning(*args, **kwargs)
+
+    elif type_ == "randompruning":
+        # Create the sparsity distribution
+        dist_config = kwargs["sparsity_distribution_fn"]
+        kwargs["sparsity_distribution_fn"] = _jaxpruner_sparsity_dist(
+            dist_config,
+        )
+
+        # Create the schedule at which we induce sparsity
+        schedule_config = kwargs["scheduler"]
+        kwargs["scheduler"] = _jaxpruner_scheduler(schedule_config)
+
+        return jaxpruner.RandomPruning(*args, **kwargs)
+    else:
+        raise NotImplementedError(f"sparse optim {type_} not implemented")
+
+
+def _jaxpruner_sparsity_dist(config):
+    type_ = config["type"].lower()
+    if "args" in config:
+        warnings.warn("key 'args' ignored for sparsity distributions")
+    kwargs = config["kwargs"]
+
+    if type_ == "erk":
+        return partial(jaxpruner.sparsity_distributions.erk, **kwargs)
+    elif type_ == "uniform":
+        return partial(jaxpruner.sparsity_distributions.uniform, **kwargs)
+    else:
+        raise NotImplementedError(f"sparisty dist {type_} not implemented")
+
+
+def _jaxpruner_scheduler(config):
+    type_ = config["type"].lower()
+    args = config["args"]
+    kwargs = config["kwargs"]
+    if type_ == "periodicschedule":
+        return jaxpruner.PeriodicSchedule(*args, **kwargs)
+    elif type_ == "oneshotschedule":
+        return jaxpruner.OneShotSchedule(*args, **kwargs)
+    elif type_ == "noupdateschedule":
+        return jaxpruner.NoUpdateShotSchedule(*args, **kwargs)
+    elif type_ == "polynomialschedule":
+        return jaxpruner.PolynomialSchedule(*args, **kwargs)
+    else:
+        raise NotImplementedError(f"schedule {type_} not implemented")
+
+
 # For parameters that each type of optimiser expects, see
 # https://optax.readthedocs.io/en/latest/api.html
-def optim(type_: str, args: tuple, kwargs: dict):
+def _optim_optax(type_: str, config: dict):
+    args = config["args"]
+    kwargs = config["kwargs"]
+
     if type_.lower() == "adam":
         return optax.adam(*args, **kwargs)
     if type_.lower() == "rmsprop":
@@ -76,4 +181,4 @@ def optim(type_: str, args: tuple, kwargs: dict):
     if type_.lower() == "sgd":
         return optax.sgd(*args, **kwargs)
     else:
-        raise NotImplementedError(f"{type_} optimiser unknown")
+        raise NotImplementedError(f"optim {type_} not implemented")

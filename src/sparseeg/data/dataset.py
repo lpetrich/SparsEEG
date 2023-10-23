@@ -19,20 +19,20 @@ class DatasetSplitter(ABC):
 
 
 class StratifiedKFold(DatasetSplitter):
-    def __init__(self, dataset, n_folds):
+    def __init__(self, ds, n_folds):
         self.n_folds = n_folds
-        self.dataset = dataset
+        self.ds = ds
 
     def split(self, fold):
         skf = model_selection.StratifiedKFold(n_splits=self.n_folds)
         return self._split(skf, fold)
 
     def _split(self, kf, fold):
-        train = deepcopy(self.dataset)
-        test = deepcopy(self.dataset)
+        train = deepcopy(self.ds)
+        test = deepcopy(self.ds)
 
         # Create the stratified splits
-        splits = kf.split(self.dataset.data[0], self.dataset.data[1])
+        splits = kf.split(self.ds.data[0], self.ds.data[1])
         train_indices = []
         test_indices = []
         for fold_num, (train_ind, test_ind) in enumerate(splits):

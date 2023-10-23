@@ -1,6 +1,7 @@
 # Eventually, this will be made into an experiment in the experiments/
 # direcotory, and we can use Andy's code to schedule
 import numpy as np
+import jaxpruner
 import yaml
 from clu import metrics
 from flax import struct
@@ -42,8 +43,9 @@ def compute_metrics(*, state, batch):
     loss = optax.softmax_cross_entropy_with_integer_labels(
         logits=logits, labels=batch['labels']
     ).mean()
+    labels = jnp.array(batch["labels"], dtype=jnp.int32)
     metric_updates = state.metrics.single_from_model_output(
-        logits=logits, labels=batch['labels'], loss=loss,
+        logits=logits, labels=labels, loss=loss,
     )
     metrics = state.metrics.merge(metric_updates)
     state = state.replace(metrics=metrics)
@@ -101,20 +103,20 @@ def main_experiment(config, verbose=False):
     # Get optimiser parameters
     optim_config = model_config["optim"]
     opt_type = optim_config["type"]
-    opt_args = optim_config["args"]
-    opt_kwargs = optim_config["kwargs"]
 
     def model_fn(seed, train_ds):
         return construct.model(
             model_type, seed, train_ds, hidden_layers, activations,
-            jax.nn.initializers.glorot_normal(), # TODO: get from config
+            jax.nn.initializers.glorot_normal(),  # TODO: get from config
         )
 
     def optim_fn():
-        return construct.optim(opt_type, opt_args, opt_kwargs)
+        return construct.optim(opt_type, optim_config)
 
     dataset_name = dataset_config["type"]
-    dataset_fn = lambda seed: get_data(dataset_name, seed)
+
+    def dataset_fn(seed):
+        return get_data(dataset_name, seed)
 
     cv = NestedCrossValidation(
         experiment_loop, model_fn, optim_fn, n_external_folds,
@@ -151,7 +153,18 @@ def experiment_loop(
         # Train for one epoch
         for x_batch, y_batch in train_dl:
             train_batch = {"inputs": x_batch, "labels": y_batch}
+
             state = training_state.step(state, train_batch)
+
+            # TODO: the train/test accuracy doesn't seem to change when
+            # updating sparsity every step. When updating sparsity every N
+            # steps for N > 1, then learning actually seems to occur
+            #
+            # Looks like the same accuracy as the first epoch on the dense
+            # network, meaning that it looks like no updating is happening??
+            post_params = state.update_sparsity()
+            state = state.replace(params=post_params)
+
             state = compute_metrics(state=state, batch=train_batch)
 
         # Compute training metrics
@@ -183,5 +196,9 @@ def experiment_loop(
 
                 data[key].append(value.item())
 
-    return data
+    pprint(data["test_accuracy"])
+    print(
+        jaxpruner.summarize_sparsity(state.params, only_total_sparsity=False),
+    )
 
+    return data

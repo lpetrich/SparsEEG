@@ -65,6 +65,8 @@ class NestedCrossValidation:
         splittable_ds = self._splitter(ds, self._n_external_folds)
         train_ds, test_ds = splittable_ds.split(fold)
 
+        # TODO: instead of adjuting batch size, should we instead just skip the
+        # remainder data?
         batch_size = adjust_batch_size(self._external_batch_size, train_ds)
 
         # Set up the dataset loader
@@ -87,6 +89,8 @@ class NestedCrossValidation:
         )
         train_ds, test_ds = splittable_ext_ds.split(fold)
 
+        # TODO: instead of adjuting batch size, should we instead just skip the
+        # remainder data?
         batch_size = adjust_batch_size(
             self._internal_batch_size, train_ds,
         )
