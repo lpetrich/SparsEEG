@@ -1,8 +1,4 @@
 black
-pytest
-pytest-cov
-pytest-check
-pylint
 pydocstyle
 mypy
 isort

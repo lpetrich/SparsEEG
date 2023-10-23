@@ -1,9 +1,10 @@
 import numpy as np
 from clu import metrics
 import jax
-import src.project.data.dataset as dataset
-import src.project.data.loader as loader
-import src.project.training.state as training_state
+
+import sparseeg.data.dataset as dataset
+import sparseeg.data.loader as loader
+import sparseeg.training.state as training_state
 import torch
 from math import gcd
 import warnings
