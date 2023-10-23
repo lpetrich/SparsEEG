@@ -125,7 +125,8 @@ def main_experiment(config, verbose=False):
         shuffle_external, shuffle_internal, dataset.StratifiedKFold
     )
 
-    return cv.run(seed, epochs, verbose)
+    cv_data = cv.run(seed, epochs, verbose)
+    return {"data": cv_data, "config": config}
 
 
 def experiment_loop(

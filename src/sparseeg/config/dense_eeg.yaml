@@ -1,7 +1,7 @@
 n_internal_folds: 2
 n_external_folds: 3
 epochs: 200
-seed: 1
+seed: 2
 save_dir: "dense_eeg"
 dataset:
   type: "WAYEEGGALDataset"
