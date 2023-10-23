@@ -101,6 +101,7 @@ def gatherMissing(
 
     with open(config_file, "r") as infile:
         config = yaml.safe_load(infile)
+    save_path = os.path.join(save_path, config["save_dir"])
 
     if not os.path.exists(save_path):
         to_run = sorted(range(total(config)))

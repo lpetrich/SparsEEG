@@ -2,6 +2,7 @@ n_internal_folds: 2
 n_external_folds: 3
 epochs: 200
 seed: 1
+save_dir: "dense_wine"
 dataset:
   type: "WineDataset"
   internal_batch_size: 0

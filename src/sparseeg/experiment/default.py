@@ -23,6 +23,7 @@ from math import gcd
 import warnings
 from pprint import pprint
 
+
 def get_data(identifier, seed):
     return dataset.load(identifier, seed)
 
@@ -196,9 +197,11 @@ def experiment_loop(
 
                 data[key].append(value.item())
 
-    pprint(data["test_accuracy"])
-    print(
-        jaxpruner.summarize_sparsity(state.params, only_total_sparsity=False),
-    )
+#     pprint(data["test_accuracy"])
+#     print(
+#         jaxpruner.summarize_sparsity(
+#             state.params, only_total_sparsity=False,
+#         ),
+#     )
 
     return data
