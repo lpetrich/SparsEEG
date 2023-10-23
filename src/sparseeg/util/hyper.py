@@ -1,13 +1,18 @@
 import yaml
 
 
+def total(config):
+    return sweeps(config, 0)[1]
+
+
 def sweeps(config, index):
     out = {}
     accum = _sweeps(config, 1, out, 1)
 
     if index > accum:
         raise IndexError(f"config index out of range ({index} > {accum})")
-    return out
+
+    return out, accum
 
 
 def _sweeps(config, index, out, accum):
