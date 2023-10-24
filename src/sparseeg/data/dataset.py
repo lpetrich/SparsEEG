@@ -80,6 +80,15 @@ class WAYEEGGALDataset(Dataset):
             self.y_samples[index],
         )
 
+    def get_dataset_for(self, label):
+        new = deepcopy(self)
+        new.data = (
+            self.x_samples[self.y_samples == label],
+            self.y_samples[self.y_samples == label],
+        )
+
+        return new
+
     @property
     def n_samples(self):
         return len(self)
@@ -113,6 +122,15 @@ class WineDataset(Dataset):
             self.x_samples[index, :],
             self.y_samples[index],
         )
+
+    def get_dataset_for(self, label):
+        new = deepcopy(self)
+        new.data = (
+            self.x_samples[self.y_samples == label],
+            self.y_samples[self.y_samples == label],
+        )
+
+        return new
 
     @property
     def n_samples(self):
@@ -163,6 +181,15 @@ class ClassifierDataset(Dataset):
             np.array(self.x_samples[index]),
             np.array(self.y_samples[index]),
         )
+
+    def get_dataset_for(self, label):
+        new = deepcopy(self)
+        new.data = (
+            self.x_samples[self.y_samples == label],
+            self.y_samples[self.y_samples == label],
+        )
+
+        return new
 
     @property
     def n_samples(self):

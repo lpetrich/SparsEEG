@@ -1,5 +1,4 @@
-# Eventually, this will be made into an experiment in the experiments/
-# direcotory, and we can use Andy's code to schedule
+from functools import partial
 import numpy as np
 import jaxpruner
 import yaml
@@ -9,6 +8,7 @@ import optax
 import jax.numpy as jnp
 import jax
 from jax import jit
+import time
 
 import sparseeg.data.dataset as dataset
 import sparseeg.data.loader as loader
@@ -129,10 +129,30 @@ def main_experiment(config, verbose=False):
     return {"data": cv_data, "config": config}
 
 
+def record_metrics(type_, state, datasets_for_labels, data):
+    for label in range(len(datasets_for_labels)):
+        ds = datasets_for_labels[label]
+        dl = loader.NumpyLoader(ds, batch_size=len(ds), shuffle=False)
+
+        # Compute label metrics
+        for x_batch, y_batch in dl:
+            batch = {"inputs": x_batch, "labels": y_batch}
+            state = compute_metrics(state=state, batch=batch)
+            for metric, value in state.metrics.compute().items():
+                key = f"{type_}_{metric}"
+                data[key][label].append(value.item())
+
+            state = state.replace(metrics=state.metrics.empty())
+
+    return state.replace(metrics=state.metrics.empty())
+
+
 def experiment_loop(
     seed, epochs, model, optim, train_ds, train_dl, test_ds, test_dl,
     verbose=False,
 ):
+    assert train_ds.n_classes == test_ds.n_classes
+
     # Construct the training state
     init_rng = jax.random.key(seed)
     state = training_state.create(
@@ -140,43 +160,26 @@ def experiment_loop(
     )
     del init_rng
 
-    metrics_history = {}
-    for key in state.metrics.keys():
-        metrics_history[f"train_{key}"] = []
-        metrics_history[f"test_{key}"] = []
-
     data = {}
     for type_ in ("train", "test"):
         for metric in state.metrics.keys():
             key = f"{type_}_{metric}"
-            data[key] = []
+            data[key] = [[] for _ in range(train_ds.n_classes)]
 
-    # Compute pre-training metrics on training set, before any training
-    for x_batch, y_batch in train_dl:
-        train_batch = {"inputs": x_batch, "labels": y_batch}
-        state = compute_metrics(state=state, batch=train_batch)
-        for metric, value in state.metrics.compute().items():
-            metrics_history[f"train_{metric}"].append(value)
+    train_datasets_for_labels = tuple(
+        train_ds.get_dataset_for(label)
+        for label in range(train_ds.n_classes)
+    )
+    test_datasets_for_labels = tuple(
+        test_ds.get_dataset_for(label)
+        for label in range(test_ds.n_classes)
+    )
 
-    # Compute pre-training metrics on testing set, before any training
-    for x_batch, y_batch in test_dl:
-        test_batch = {"inputs": x_batch, "labels": y_batch}
-        test_state = state
-        test_state = compute_metrics(state=test_state, batch=test_batch)
+    # Record performance before training
+    state = record_metrics("train", state, train_datasets_for_labels, data)
+    state = record_metrics("test", state, test_datasets_for_labels, data)
 
-        for metric, value in test_state.metrics.compute().items():
-            metrics_history[f"test_{metric}"].append(value)
-
-    for type_ in ("train", "test"):
-        for metric in state.metrics.keys():
-            key = f"{type_}_{metric}"
-            value = metrics_history[key][-1]
-
-            if verbose:
-                print(f"\t{type_.title()} {metric.title()}:\t {value:.3f}")
-
-            data[key].append(value.item())
-
+    start_time = time.time()
     for epoch in range(epochs):
         # Train for one epoch
         for x_batch, y_batch in train_dl:
@@ -193,42 +196,9 @@ def experiment_loop(
             post_params = state.update_sparsity()
             state = state.replace(params=post_params)
 
-            state = compute_metrics(state=state, batch=train_batch)
+        # Record performance at the end of each epoch
+        state = record_metrics("train", state, train_datasets_for_labels, data)
+        state = record_metrics("test", state, test_datasets_for_labels, data)
 
-        # Compute training metrics
-        for metric, value in state.metrics.compute().items():
-            metrics_history[f"train_{metric}"].append(value)
-
-        # Reset the training metrics for the next epoch
-        state = state.replace(metrics=state.metrics.empty())
-
-        # Compute metrics on test data
-        for x_batch, y_batch in test_dl:
-            test_batch = {"inputs": x_batch, "labels": y_batch}
-            test_state = state
-            test_state = compute_metrics(state=test_state, batch=test_batch)
-
-            for metric, value in test_state.metrics.compute().items():
-                metrics_history[f"test_{metric}"].append(value)
-
-        # Print data at the end of the epoch
-        if verbose:
-            print(f"==> Epoch {epoch}:")
-        for type_ in ("train", "test"):
-            for metric in state.metrics.keys():
-                key = f"{type_}_{metric}"
-                value = metrics_history[key][-1]
-
-                if verbose:
-                    print(f"\t{type_.title()} {metric.title()}:\t {value:.3f}")
-
-                data[key].append(value.item())
-
-#     pprint(data["test_accuracy"])
-#     print(
-#         jaxpruner.summarize_sparsity(
-#             state.params, only_total_sparsity=False,
-#         ),
-#     )
-
+    data["total_time"] = time.time() - start_time
     return data

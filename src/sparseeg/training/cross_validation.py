@@ -115,6 +115,7 @@ class NestedCrossValidation:
         self._save_data[key] = {}
 
         save_data = self._save_data[key]
+        save_data["external"] = {}
         for i in range(self._n_external_folds):
 
             # Get the dataset
@@ -145,14 +146,22 @@ class NestedCrossValidation:
 
                 save_data[f"external_fold_{i}"][f"internal_fold_{j}"] = data
 
-        # Train/Test on all data
-        model = self._model_fn(seed, train_ds)
-        optim = self._optim_fn()
-        data = self.experiment_loop(
-            seed, epochs, model, optim, ext_train_ds, ext_train_dl,
-            ext_test_ds, ext_test_dl, verbose=verbose,
-        )
-        save_data["external"] = data
+            # Train on all training data and evaluate on validation data for
+            # fold i
+            # Get the dataset
+            ext_ds = self._dataset_fn(seed)
+            # Split into external folds
+            ext_ds = self._split_external(ext_ds, i)
+            ext_train_ds, ext_test_ds, ext_train_dl, ext_test_dl = ext_ds
+
+            # Train/Test on all data
+            model = self._model_fn(seed, train_ds)
+            optim = self._optim_fn()
+            data = self.experiment_loop(
+                seed, epochs, model, optim, ext_train_ds, ext_train_dl,
+                ext_test_ds, ext_test_dl, verbose=verbose,
+            )
+            save_data["external"][f"fold_{i}"] = data
 
         # pprint(save_data["external"]["test_accuracy"])
         return self._save_data
