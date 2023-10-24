@@ -151,6 +151,32 @@ def experiment_loop(
             key = f"{type_}_{metric}"
             data[key] = []
 
+    # Compute pre-training metrics on training set, before any training
+    for x_batch, y_batch in train_dl:
+        train_batch = {"inputs": x_batch, "labels": y_batch}
+        state = compute_metrics(state=state, batch=train_batch)
+        for metric, value in state.metrics.compute().items():
+            metrics_history[f"train_{metric}"].append(value)
+
+    # Compute pre-training metrics on testing set, before any training
+    for x_batch, y_batch in test_dl:
+        test_batch = {"inputs": x_batch, "labels": y_batch}
+        test_state = state
+        test_state = compute_metrics(state=test_state, batch=test_batch)
+
+        for metric, value in test_state.metrics.compute().items():
+            metrics_history[f"test_{metric}"].append(value)
+
+    for type_ in ("train", "test"):
+        for metric in state.metrics.keys():
+            key = f"{type_}_{metric}"
+            value = metrics_history[key][-1]
+
+            if verbose:
+                print(f"\t{type_.title()} {metric.title()}:\t {value:.3f}")
+
+            data[key].append(value.item())
+
     for epoch in range(epochs):
         # Train for one epoch
         for x_batch, y_batch in train_dl:
