@@ -7,7 +7,7 @@ def total(config):
 
 def sweeps(config, index):
     out = {}
-    accum = _sweeps(config, 1, out, 1)
+    accum = _sweeps(config, index, out, 1)
 
     if index > accum:
         raise IndexError(f"config index out of range ({index} > {accum})")

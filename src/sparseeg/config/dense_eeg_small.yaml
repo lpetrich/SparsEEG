@@ -1,6 +1,6 @@
 n_internal_folds: 5
 n_external_folds: 5
-epochs: 500
+epochs: 200
 seed: [0, 1, 2, 3, 4]
 save_dir: "dense_eeg"
 dataset:
@@ -11,7 +11,7 @@ dataset:
   shuffle_external: true
 model:
   type: "DenseMLP"
-  hidden_layers: [[16, 16], [32, 32], [64, 64]]
+  hidden_layers: [[16, 16], [32, 32]]
   activations: [["relu", "relu"]]
   optim:
     type: "adam"

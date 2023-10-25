@@ -50,6 +50,7 @@ def run(experiment_file, config_file, index, save_at):
 
     # Run the experiment
     data = experiment_module.main_experiment(config)
+    data = {index: data}
 
     # Save output data here
     save_at = os.path.join(save_at, config["save_dir"])
