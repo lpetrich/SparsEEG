@@ -21,7 +21,6 @@ import flax.linen as nn
 import torch
 from math import gcd
 import warnings
-from pprint import pprint
 
 
 def get_data(identifier, seed):
@@ -132,6 +131,8 @@ def main_experiment(config, verbose=False):
 def record_metrics(type_, state, datasets_for_labels, data):
     for label in range(len(datasets_for_labels)):
         ds = datasets_for_labels[label]
+        if len(ds) == 0:
+            continue
         dl = loader.NumpyLoader(ds, batch_size=len(ds), shuffle=False)
 
         # Compute label metrics

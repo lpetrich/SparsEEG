@@ -1,0 +1,20 @@
+n_internal_folds: 10
+n_external_folds: 10
+epochs: 200
+seed: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+save_dir: "dense_wine"
+dataset:
+  type: "WineDataset"
+  internal_batch_size: 0
+  external_batch_size: 0
+  shuffle_internal: true
+  shuffle_external: true
+model:
+  type: "DenseMLP"
+  hidden_layers: [[16, 16], [32, 32], [64, 64]]
+  activations: [["relu", "relu"]]
+  optim:
+    type: "adam"
+    args: [[]]
+    kwargs:
+      learning_rate: [0.1, 0.01, 0.001, 0.0001]

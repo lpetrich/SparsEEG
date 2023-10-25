@@ -63,8 +63,10 @@ class WAYEEGGALDataset(Dataset):
         subject = 1
         data = load_wayeeggal(subject=subject, train=True)
         self.x_samples = data["data"]
-        self.y_samples = data["target"]
-        self._n_classes = 12
+        self.y_samples = data["target"] - 1  # Renumber targets to start from 0
+
+        self._n_classes = len(np.unique(self.y_samples))
+
         print(f"Number of x samples: {self.x_samples.shape}")
         print(f"Number of y samples: {self.y_samples.shape}")
         print(f"Number of classes: {self._n_classes}")
