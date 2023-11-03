@@ -1,6 +1,9 @@
 import numpy as np
+import hashlib
 from clu import metrics
 import jax
+import os
+import pickle
 
 import sparseeg.data.dataset as dataset
 import sparseeg.data.loader as loader
@@ -38,14 +41,33 @@ class NestedCrossValidation:
     the experiment loop is cached during each loop of the CV procedure.
     """
     def __init__(
-        self, experiment_loop, model_fn, optim_fn, n_external_folds,
-        n_internal_folds, dataset_fn, external_batch_size, internal_batch_size,
-        shuffle_external, shuffle_internal, splitter
+        self, experiment_loop, checkpoint_dir, save_file, config, model_fn,
+        optim_fn, n_external_folds, n_internal_folds, dataset_fn,
+        external_batch_size, internal_batch_size, shuffle_external,
+        shuffle_internal, splitter
     ):
         self.experiment_loop = experiment_loop
 
+        # Checkpointing stuff: we save the checkpoint data at the hash digest
+        # of the configuration file
+        self._checkpoint_dir = checkpoint_dir
+        self._data_save_file = save_file  # Where data will be stored
+        self._config = config
+        m = hashlib.sha256()
+        m.update(str(self._config).encode())
+        self._digest = str(m.hexdigest())
+        self._checkpoint_filename = os.path.join(
+            self._checkpoint_dir, f"{self._digest}.pkl",
+        )
+        self._current_external_fold = 0
+        self._current_internal_fold = 0
+        self._completed = False
+
+        self._model_config = config["model"]
         self._model_fn = model_fn
+        self._optim_config = config["model"]["optim"]
         self._optim_fn = optim_fn
+        self._dataset_config = config["dataset"]
         self._dataset_fn = dataset_fn
 
         self._n_external_folds = n_external_folds
@@ -60,6 +82,33 @@ class NestedCrossValidation:
         self._splitter = splitter
 
         self._save_data = {}
+
+    def load_checkpoint(self):
+        if os.path.isfile(self._checkpoint_filename):
+            print("loading checkpoint file:", self._checkpoint_filename)
+            with open(self._checkpoint_filename, "rb") as infile:
+                cv = pickle.load(infile)
+
+            print("Loaded checkpoint:")
+            print(f"\tCV loop completed:\t {cv._completed}")
+            print(
+                f"\tExternal Fold:\t {cv._current_external_fold}/" +
+                f"{cv._n_external_folds}",
+            )
+            print(
+                f"\tInternal Fold:\t {cv._current_internal_fold}/" +
+                f"{cv._n_internal_folds}",
+            )
+
+            return cv
+
+        return self
+
+    def checkpoint(self):
+        if not os.path.exists(self._checkpoint_dir):
+            os.makedirs(self._checkpoint_dir)
+        with open(self._checkpoint_filename, "wb") as outfile:
+            pickle.dump(self, outfile)
 
     def _split_external(self, ds, fold):
         splittable_ds = self._splitter(ds, self._n_external_folds)
@@ -106,64 +155,106 @@ class NestedCrossValidation:
 
         return train_ds, train_dl, test_ds, test_dl
 
-    def run(self, seed, epochs, verbose=False):
+    def run(self, seed, epochs, save_file, verbose=False):
         """
         Run the nested cross validation procedure
         """
-        assert f"seed_{seed}" not in self._save_data.keys()
+        print("Running Nested CV")
+
+        if self._completed:
+            print("CV loop completed, returning cached data")
+            return self._save_data
+
+        if f"seed_{seed}" in self._save_data.keys():
+            warnings.warn(
+                f"key seed_{seed} already found in dict, continuing " +
+                f"adding to seed data",
+            )
+
         key = f"seed_{seed}"
         self._save_data[key] = {}
 
         save_data = self._save_data[key]
         save_data["external"] = {}
-        for i in range(self._n_external_folds):
-
+        external_folds_to_run = range(
+            self._current_external_fold, self._n_external_folds,
+        )
+        for i in external_folds_to_run:
+            print(f"external fold {i} starting")
             # Get the dataset
-            ext_ds = self._dataset_fn(seed)
-
+            ext_ds = self._dataset_fn(self._dataset_config, seed)
             # Split the dataset into folds
-            ext_ds = self._split_external(ext_ds, i)
-            ext_train_ds, ext_test_ds, ext_train_dl, ext_test_dl = ext_ds
+            _ext_ds = self._split_external(ext_ds, i)
+            ext_train_ds, ext_test_ds, ext_train_dl, ext_test_dl = _ext_ds
 
             # Internal CV loop
             save_data[f"external_fold_{i}"] = {}
-            for j in range(self._n_internal_folds):
+            internal_folds_to_run = range(
+                self._current_internal_fold, self._n_internal_folds,
+            )
+            for j in internal_folds_to_run:
                 # Split the fold into multiple sub-folds
-                train_ds, train_dl, test_ds, test_dl = self._split_internal(
+                _int_ds = self._split_internal(
                     ext_train_ds, j
                 )
+                _train_ds, _train_dl, _test_ds, _test_dl = _int_ds
+                internal_train_ds = _train_ds
+                internal_test_ds = _test_ds
+                internal_train_dl = _train_dl
+                internal_test_dl = _test_dl
 
                 # Construct a new model for each fold
-                model = self._model_fn(seed, train_ds)
+                model = self._model_fn(
+                    self._model_config, seed, internal_train_ds,
+                )
 
                 # Construct a new optimiser for each fold
-                optim = self._optim_fn()
+                optim = self._optim_fn(self._optim_config)
 
+                # No caching is done during the experiment loop, only after
+                # I.e., we cache on a fold-by-fold basis, rather than on an
+                # epoch-by-epoch basis
                 data = self.experiment_loop(
-                    seed, epochs, model, optim, train_ds, train_dl, test_ds,
-                    test_dl, verbose=verbose,
+                    self, seed, epochs, model, optim, internal_train_ds,
+                    internal_train_dl, internal_test_ds, internal_test_dl,
+                    verbose=verbose,
                 )
 
                 save_data[f"external_fold_{i}"][f"internal_fold_{j}"] = data
+                self._current_internal_fold = j + 1  # Set next fold to run
+
+            # Restart internal fold numbering for the next external fold
+            self._current_internal_fold = 0
 
             # Train on all training data and evaluate on validation data for
             # fold i
             # Get the dataset
-            ext_ds = self._dataset_fn(seed)
-            # Split into external folds
-            ext_ds = self._split_external(ext_ds, i)
-            ext_train_ds, ext_test_ds, ext_train_dl, ext_test_dl = ext_ds
+            ext_ds = self._dataset_fn(self._dataset_config, seed)
+            # Split the dataset into folds
+            _ext_ds = self._split_external(ext_ds, i)
+            ext_train_ds, ext_test_ds, ext_train_dl, ext_test_dl = _ext_ds
 
             # Train/Test on all data
-            model = self._model_fn(seed, train_ds)
-            optim = self._optim_fn()
+            model = self._model_fn(
+                self._model_config, seed, ext_train_ds,
+            )
+            optim = self._optim_fn(self._optim_config)
+
+            # No caching is done during the experiment loop, only after
+            # I.e., we cache on a fold-by-fold basis, rather than on an
+            # epoch-by-epoch basis
             data = self.experiment_loop(
-                seed, epochs, model, optim, ext_train_ds, ext_train_dl,
+                self, seed, epochs, model, optim, ext_train_ds, ext_train_dl,
                 ext_test_ds, ext_test_dl, verbose=verbose,
             )
             save_data["external"][f"fold_{i}"] = data
+            self._current_external_fold = i + 1  # Set next fold to run
+
+            print(self._current_external_fold)
 
         # pprint(save_data["external"]["test_accuracy"])
+        self._completed = True
+        print("CV loop completed")
         return self._save_data
 
 

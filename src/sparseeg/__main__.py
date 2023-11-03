@@ -40,6 +40,7 @@ def run(experiment_file, config_file, index, save_at):
     # Parse config file
     with open(config_path, "r") as infile:
         config = yaml.safe_load(infile)
+        full_config = config
     config, _ = hyper.sweeps(config, index)
 
     # Import the experiment module
@@ -48,15 +49,17 @@ def run(experiment_file, config_file, index, save_at):
     experiment_module_name = f"sparseeg.experiment.{experiment_module_name}"
     globals()["experiment_module"] = import_module(experiment_module_name)
 
-    # Run the experiment
-    data = experiment_module.main_experiment(config)
-    data = {index: data}
-
-    # Save output data here
+    # Create save directory
     save_at = os.path.join(save_at, config["save_dir"])
+    save_file = os.path.join(save_at, f"{index}.pkl")
     if not os.path.isdir(save_at):
         os.makedirs(save_at)
-    save_file = os.path.join(save_at, f"{index}.pkl")
+
+    # Run the experiment
+    data = experiment_module.main_experiment(config, save_file)
+    data = {hyper.index_of(full_config, config): data}
+
+    # Save output data here
     with open(save_file, "wb") as outfile:
         pickle.dump(data, outfile)
 
