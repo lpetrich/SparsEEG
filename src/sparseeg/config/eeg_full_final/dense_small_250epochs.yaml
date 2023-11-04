@@ -2,7 +2,7 @@ train_percent: 0.8
 valid_percent: 0.1
 epochs: 250
 seed: 0
-save_dir: "dense_small_250epochs"
+save_dir: "dense_small_250epochs_full"
 dataset:
   type: "WAYEEGGALDataset"
   batch_size: 32
