@@ -10,11 +10,18 @@ from importlib import import_module
 
 import sparseeg
 
+import orbax
+import flax
+from flax.training import orbax_utils
 import click
 import os
 import pickle
 import sparseeg.util.hyper as hyper
 import yaml
+
+
+# Use orbax for model saving
+flax.config.update('flax_use_orbax_checkpointing', True)
 
 
 @click.command()
@@ -59,9 +66,12 @@ def run(experiment_file, config_file, index, save_at):
     data = experiment_module.main_experiment(config, save_file)
     data = {hyper.index_of(full_config, config): data}
 
-    # Save output data here
-    with open(save_file, "wb") as outfile:
-        pickle.dump(data, outfile)
+    # # Save output data with orbax
+    orbax_checkpointer = orbax.checkpoint.PyTreeCheckpointer()
+    save_args = orbax_utils.save_args_from_target(data)
+    orbax_checkpointer.save(
+        save_file, data, save_args=save_args
+    )
 
 
 if __name__ == "__main__":

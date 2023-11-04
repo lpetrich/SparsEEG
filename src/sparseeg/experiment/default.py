@@ -4,6 +4,7 @@ import jaxpruner
 import yaml
 from clu import metrics
 from flax import struct
+from flax.training import orbax_utils
 import optax
 import jax.numpy as jnp
 import jax
@@ -221,6 +222,7 @@ def experiment_loop(
         state = record_metrics("valid", state, valid_datasets_for_labels, data)
 
     data["total_time"] = time.time() - start_time
+    data["model"] = state
 
     acc = np.array(data["train_accuracy"])
 

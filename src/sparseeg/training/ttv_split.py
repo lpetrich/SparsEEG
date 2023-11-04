@@ -88,6 +88,7 @@ class TTVSplitTrainer:
         return self._save_data
 
 
+# Adjusts dataset size to account for batch size
 def adjust_for_batch_size(batch_size, ds):
     if batch_size == 0:
         return len(ds), ds
