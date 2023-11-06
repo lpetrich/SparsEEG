@@ -3,6 +3,25 @@ from copy import deepcopy
 import orbax
 from flax.training import orbax_utils
 import numpy as np
+import warnings
+
+
+def get(data, hyper, key):
+    hyper = str(hyper)
+
+    seed_data = []
+    new_data = data[hyper]["data"]
+    for seed in new_data:
+        # TODO: fix once data is actually in proper format
+        seed_data.append(new_data[seed][key][1])
+        seed_data.append(new_data[seed][key][2])
+        seed_data.append(new_data[seed][key][4])
+
+    out = np.array(seed_data)
+    if out.ndim == 1:
+        out = np.expand_dims(out, 0)
+
+    return out.T
 
 
 def best(perfs, agg, reverse=False):
@@ -15,18 +34,13 @@ def best(perfs, agg, reverse=False):
 
 def perfs(data, tune_by, inner_agg, outer_agg):
     hyper_perfs = [[] for _ in range(len(data.keys()))]
-    print(len(hyper_perfs), data.keys())
     for hyper in data:
-        if hyper not in "1":
-            break
         seed_data = []
         for seed in data[hyper]["data"]:
             d = data[hyper]["data"][seed][tune_by]
             label_data = []
             for i, label in enumerate(d):
-                print(label, i, seed, hyper)
                 label_data.append(inner_agg(label))
-                print()
             seed_data.append(label_data)
 
         seed_data = np.array(seed_data)
@@ -36,9 +50,14 @@ def perfs(data, tune_by, inner_agg, outer_agg):
         hyper_perfs[int(hyper)] = outer_agg(seed_data, axis=0)
 
     out = np.array(hyper_perfs)
-    out[np.isnan(out)] = np.finfo(np.float32).min
 
-    return out.T  # (n_hypers × labels)
+    # This is terrible, but oh well
+    if "accuracy" in tune_by or "std" in tune_by:
+        out[np.isnan(out)] = 0.0
+    else:
+        out[np.isnan(out)] = np.finfo(np.float32).min
+
+    return out
 
 
 def renumber(data, indices):
