@@ -189,15 +189,15 @@ def experiment_loop(
 
     train_datasets_for_labels = tuple(
         train_ds.get_dataset_for(label)
-        for label in range(train_ds.n_classes)
+        for label in train_ds.classes
     )
     test_datasets_for_labels = tuple(
         test_ds.get_dataset_for(label)
-        for label in range(test_ds.n_classes)
+        for label in test_ds.classes
     )
     valid_datasets_for_labels = tuple(
         valid_ds.get_dataset_for(label)
-        for label in range(valid_ds.n_classes)
+        for label in valid_ds.classes
     )
 
     # Record performance before training

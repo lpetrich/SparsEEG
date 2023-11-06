@@ -169,6 +169,10 @@ class WAYEEGGALDataset(Dataset):
     def n_classes(self):
         return self._n_classes
 
+    @property
+    def classes(self):
+        return np.unique(self.y_samples)
+
 
 class WineDataset(Dataset):
     def __init__(self):

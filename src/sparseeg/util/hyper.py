@@ -1,5 +1,44 @@
 import yaml
 from copy import deepcopy
+import orbax
+from flax.training import orbax_utils
+import numpy as np
+
+
+def best(perfs, agg, reverse=False):
+    perfs = agg(perfs, axis=1)
+    if reverse:
+        return np.argmin(perfs)
+    else:
+        return np.argmax(perfs)
+
+
+def perfs(data, tune_by, inner_agg, outer_agg):
+    hyper_perfs = [[] for _ in range(len(data.keys()))]
+    print(len(hyper_perfs), data.keys())
+    for hyper in data:
+        if hyper not in "1":
+            break
+        seed_data = []
+        for seed in data[hyper]["data"]:
+            d = data[hyper]["data"][seed][tune_by]
+            label_data = []
+            for i, label in enumerate(d):
+                print(label, i, seed, hyper)
+                label_data.append(inner_agg(label))
+                print()
+            seed_data.append(label_data)
+
+        seed_data = np.array(seed_data)
+
+        if seed_data.ndim == 1:
+            seed_data = np.expand_dims(seed_data, 0)
+        hyper_perfs[int(hyper)] = outer_agg(seed_data, axis=0)
+
+    out = np.array(hyper_perfs)
+    out[np.isnan(out)] = np.finfo(np.float32).min
+
+    return out.T  # (n_hypers × labels)
 
 
 def renumber(data, indices):
