@@ -10,6 +10,7 @@ from importlib import import_module
 
 import sparseeg
 
+from time import time
 import orbax
 import flax
 from flax.training import orbax_utils
@@ -61,6 +62,9 @@ def run(experiment_file, config_file, index, save_at):
     save_file = os.path.join(save_at, f"{index}.pkl")
     if not os.path.isdir(save_at):
         os.makedirs(save_at)
+    if os.path.exists(save_file):
+        new_file = save_file + f".old_{int(time())}"
+        os.rename(save_file, new_file)
 
     # Run the experiment
     data = experiment_module.main_experiment(config, save_file)
@@ -69,9 +73,11 @@ def run(experiment_file, config_file, index, save_at):
     # # Save output data with orbax
     orbax_checkpointer = orbax.checkpoint.PyTreeCheckpointer()
     save_args = orbax_utils.save_args_from_target(data)
+    print(f"Saving at {save_file}")
     orbax_checkpointer.save(
         save_file, data, save_args=save_args
     )
+    print(f"Saved")
 
 
 if __name__ == "__main__":

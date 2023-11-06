@@ -224,6 +224,4 @@ def experiment_loop(
     data["total_time"] = time.time() - start_time
     data["model"] = state
 
-    acc = np.array(data["train_accuracy"])
-
     return data
