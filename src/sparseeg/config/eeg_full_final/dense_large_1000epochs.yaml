@@ -9,7 +9,7 @@ dataset:
   shuffle: true
 model:
   type: "DenseMLP"
-  hidden_layers: [[128, 128], [256, 256], [512, 512]]
+  hidden_layers: [[128, 128], [256, 256], [512, 512], [1024, 1024]]
   activations: [["relu", "relu"]]
   optim:
     type: "adam"
