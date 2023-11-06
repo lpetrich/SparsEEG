@@ -172,6 +172,7 @@ def experiment_loop(
 ):
     assert train_ds.n_classes == test_ds.n_classes
     assert train_ds.n_classes == valid_ds.n_classes
+    start_time = time.time()
 
     # Construct the training state
     init_rng = jax.random.key(seed)
@@ -204,7 +205,6 @@ def experiment_loop(
     state = record_metrics("test", state, test_datasets_for_labels, data)
     state = record_metrics("valid", state, valid_datasets_for_labels, data)
 
-    start_time = time.time()
     for epoch in range(epochs):
         print(f"epoch {epoch} completed")
         # Train for one epoch
