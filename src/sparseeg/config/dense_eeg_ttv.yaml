@@ -1,15 +1,15 @@
 train_percent: 0.8
 valid_percent: 0.1
-epochs: 5
+epochs: 1000
 seed: 0
-save_dir: "test"
+save_dir: "dense_eeg_ttv"
 dataset:
-  type: "WAYEEGGALDataset-Low"
-  batch_size: 32
+  type: "WAYEEGGALDataset"
+  batch_size: [0, 32]
   shuffle: true
 model:
   type: "DenseMLP"
-  hidden_layers: [[16, 16], [32, 32], [64, 64]]
+  hidden_layers: [[16, 16], [32, 32], [64, 64], [128, 128], [256, 256]]
   activations: [["relu", "relu"]]
   optim:
     type: "adam"
