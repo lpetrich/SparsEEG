@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+from tqdm import tqdm
 import click
 import pickle
 import os
@@ -30,7 +31,7 @@ def combine(dir, config, filename, force):
 
     all_data = {}
     chptr = orbax.checkpoint.PyTreeCheckpointer()
-    for f in files:
+    for f in tqdm(files):
         d = chptr.restore(f)
         all_data = _combine(all_data, d, config)
 
