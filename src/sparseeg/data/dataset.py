@@ -126,13 +126,20 @@ class WAYEEGGALDataset(Dataset):
 
         self.y_samples -= 1  # Renumber targets to start from 0
 
-        self._n_classes = len(np.unique(self.y_samples))
+        # Renumber labels from 0
+        classes = np.unique(self.y_samples)
+        for i, c in enumerate(classes):
+            self.y_samples[self.y_samples == c] = i
+
+        self._classes = np.unique(self.y_samples)
 
         print(f"Number of x samples: {self.x_samples.shape}")
         print(f"Number of y samples: {self.y_samples.shape}")
-        print(f"Number of classes: {self._n_classes}")
+        print(f"Number of classes: {self.n_classes}")
         print(f"Target names: {data['target_names']}")
         print(f"Feature names: {data['feature_names']}")
+        for c in self._classes:
+            print(f"\tClass {c} samples:", sum(self.y_samples == c))
 
     def __len__(self):
         return len(self.y_samples)
@@ -167,11 +174,11 @@ class WAYEEGGALDataset(Dataset):
 
     @property
     def n_classes(self):
-        return self._n_classes
+        return len(self.classes)
 
     @property
     def classes(self):
-        return np.unique(self.y_samples)
+        return self._classes
 
 
 class WineDataset(Dataset):
