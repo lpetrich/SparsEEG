@@ -8,14 +8,17 @@ import yaml
 import sparseeg.util.hyper as hyper
 import orbax
 from flax.training import orbax_utils
+import fnmatch
 
 
 @click.argument("config")
 @click.argument("dir")
 @click.option("-s", "--filename", default="combined")
 @click.option("-f", "--force", is_flag=True)
+@click.option("-i", "--ignore")
 @click.command()
-def combine(dir, config, filename, force):
+def combine(dir, config, filename, force, ignore):
+    ignore = ignore.split(",")
     fpath = "./src/sparseeg/config"
     config_path = os.path.join(fpath, config)
     if not os.path.exists(config_path):
@@ -28,12 +31,13 @@ def combine(dir, config, filename, force):
     data_dir = os.path.join(dir, config["save_dir"])
     files = os.listdir(data_dir)
     files = list(map(lambda f: os.path.join(data_dir, f), files))
+    files = fnmatch.filter(files, "*.pkl")
 
     all_data = {}
     chptr = orbax.checkpoint.PyTreeCheckpointer()
     for f in tqdm(files):
         d = chptr.restore(f)
-        all_data = _combine(all_data, d, config)
+        all_data = _combine(all_data, d, config, ignore)
 
     filename = os.path.join(data_dir, filename)
     if os.path.exists(filename) and not force:
@@ -52,9 +56,17 @@ def get_keys(d):
     return list(d.keys())
 
 
-def _combine(all_data, d, config):
+def _combine(all_data, d, config, ignore):
     key = get_key(d)
     hyper_index = hyper.index_of(config, d[key]["config"])
+
+    seed_key = get_key(d[key]["data"])
+    for ig in ignore:
+        d_keys = d[key]["data"][seed_key].keys()
+        if ig not in d_keys:
+            msg = f"key {ig} not found in {d_keys}"
+            raise KeyError(msg)
+        del d[key]["data"][seed_key][ig]
 
     if hyper_index not in all_data.keys():
         all_data[hyper_index] = d[key]

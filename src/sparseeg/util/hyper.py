@@ -1,3 +1,5 @@
+import os
+import fnmatch
 import yaml
 from copy import deepcopy
 import orbax
@@ -12,10 +14,7 @@ def get(data, hyper, key):
     seed_data = []
     new_data = data[hyper]["data"]
     for seed in new_data:
-        # TODO: fix once data is actually in proper format
-        seed_data.append(new_data[seed][key][1])
-        seed_data.append(new_data[seed][key][2])
-        seed_data.append(new_data[seed][key][4])
+        seed_data.append(new_data[seed][key])
 
     out = np.array(seed_data)
     if out.ndim == 1:
@@ -34,7 +33,10 @@ def best(perfs, agg, reverse=False):
 
 def perfs(data, tune_by, inner_agg, outer_agg):
     hyper_perfs = [[] for _ in range(len(data.keys()))]
-    for hyper in data:
+    keys = list(map(lambda x: int(x), data.keys()))
+    keys = list(map(lambda x: str(x), sorted(keys)))
+    for j, hyper in enumerate(keys):
+        hyper = str(hyper)
         seed_data = []
         for seed in data[hyper]["data"]:
             d = data[hyper]["data"][seed][tune_by]
@@ -47,7 +49,8 @@ def perfs(data, tune_by, inner_agg, outer_agg):
 
         if seed_data.ndim == 1:
             seed_data = np.expand_dims(seed_data, 0)
-        hyper_perfs[int(hyper)] = outer_agg(seed_data, axis=0)
+        # hyper_perfs[int(hyper)] = outer_agg(seed_data, axis=0)
+        hyper_perfs[j] = outer_agg(seed_data, axis=0)
 
     out = np.array(hyper_perfs)
 
