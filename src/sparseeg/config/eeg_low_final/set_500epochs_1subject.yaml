@@ -1,26 +1,30 @@
-n_internal_folds: 2
-n_external_folds: 3
-epochs: 1000
-seed: 1
-save_dir: "set_large_1000epochs_low"
+train_percent: 0.8
+valid_percent: 0.1
+epochs: 500
+seed: [0, 1, 2]
+save_dir: "set_500epochs_1subject"
 dataset:
   type: "WAYEEGGALDataset-Low"
-  batch_size: 32
+  batch_size: 0
   shuffle: true
+  n_subjects: 1
 model:
   type: "DenseMLP"
-  hidden_layers: [[256, 256], [512, 512], [1024, 1024]]
+  hidden_layers: [[1024, 1024]]
   activations: [["relu", "relu"]]
   optim:
     type: "set"
     args: [[]]
     kwargs:
-      drop_fraction_fn: "lambda _: 0.3" # Number of weights to prune at iter i
+      drop_fraction_fn: [
+        "lambda _: 0.15",
+        "lambda _: 0.3",
+      ] # Number of weights to prune at iter i
       scheduler:
         type: "PeriodicSchedule"
         args: []
         kwargs:
-          update_freq: [1, 5, 10]
+          update_freq: [25, 50, 75]
           update_start_step: 0
           update_end_step: null
       sparsity_distribution_fn:

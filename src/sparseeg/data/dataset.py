@@ -92,15 +92,22 @@ class StratifiedKFold(DatasetSplitter):
 
 
 class WAYEEGGALDataset(Dataset):
-    def __init__(self, trim_level):
+    def __init__(self, trim_level, config, seed):
         print(f"Initializing WAL-EEG-GAL Dataset of type: {Dataset}")
-        # this will return all series for one subject
-        # TODO: add subject to config file?
-        subject = 1
-        data = load_wayeeggal(subject=subject, train=True)
+        n = config["n_subjects"]
+        assert n > 0
+        rng = np.random.default_rng(seed=seed)
+        subjects = rng.choice(range(1, 13), n, replace=False)
 
-        self.x_samples = data["data"]
-        self.y_samples = data["target"]
+        self.x_samples, self.y_samples = load_wayeeggal(
+            subject=subjects[0], train=True, return_X_y=True,
+        )
+        for subject in subjects[1:]:
+            x_samples, y_samples = load_wayeeggal(
+                subject=subject, train=True, return_X_y=True,
+            )
+            self.x_samples = np.concatenate((self.x_samples, x_samples))
+            self.y_samples = np.concatenate((self.y_samples, y_samples))
 
         if trim_level == "kaggle":
             inds = np.where(
@@ -136,8 +143,7 @@ class WAYEEGGALDataset(Dataset):
         print(f"Number of x samples: {self.x_samples.shape}")
         print(f"Number of y samples: {self.y_samples.shape}")
         print(f"Number of classes: {self.n_classes}")
-        print(f"Target names: {data['target_names']}")
-        print(f"Feature names: {data['feature_names']}")
+        print(f"Targets: {self.classes}")
         for c in self._classes:
             print(f"\tClass {c} samples:", sum(self.y_samples == c))
 
@@ -186,7 +192,7 @@ class WineDataset(Dataset):
         data = load_wine()
         self.x_samples = data["data"]
         self.y_samples = data["target"]
-        self._n_classes = 3
+        self._classes = np.unique(self.y_samples)
 
     def __len__(self):
         return len(self.y_samples)
@@ -207,6 +213,14 @@ class WineDataset(Dataset):
         return new
 
     @property
+    def n_classes(self):
+        return len(self.classes)
+
+    @property
+    def classes(self):
+        return self._classes
+
+    @property
     def n_samples(self):
         return len(self)
 
@@ -219,14 +233,10 @@ class WineDataset(Dataset):
         self.x_samples = data[0]
         self.y_samples = data[1]
 
-    @property
-    def n_classes(self):
-        return self._n_classes
-
 
 class ClassifierDataset(Dataset):
     def __init__(self, rng, n_samples, x_dim, n_classes):
-        self._n_classes = n_classes
+        self.n_classes = n_classes
 
         key, key_sample, key_noise = jax.random.split(rng, 3)
         x_samples = jax.random.normal(key_sample, (n_samples, x_dim))
@@ -307,7 +317,7 @@ def load_train_test(identifier: str, seed):
 
 
 # Load a full dataset
-def load(identifier: str, seed):
+def load(identifier: str, config, seed):
     train_init_rng = jax.random.key(seed)
     identifier = identifier.lower()
 
@@ -318,9 +328,9 @@ def load(identifier: str, seed):
     elif identifier == "winedataset":
         train_ds = WineDataset()
     elif identifier == "wayeeggaldataset":
-        train_ds = WAYEEGGALDataset("kaggle")
+        train_ds = WAYEEGGALDataset("kaggle", config, seed)
     elif identifier == "wayeeggaldataset-low":
-        train_ds = WAYEEGGALDataset("low")
+        train_ds = WAYEEGGALDataset("low", config, seed)
     else:
         raise NotImplementedError(f"{identifier} does not exist")
 

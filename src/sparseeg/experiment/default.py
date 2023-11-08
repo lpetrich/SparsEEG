@@ -28,8 +28,8 @@ from math import gcd
 import warnings
 
 
-def get_data(identifier, seed):
-    return dataset.load(identifier, seed)
+def get_data(identifier, config, seed):
+    return dataset.load(identifier, config, seed)
 
 
 ####################################################################
@@ -89,6 +89,7 @@ def working_experiment():
 def main_experiment(config, save_file, verbose=False):
     seed = config["seed"]
     torch.manual_seed(seed)  # Needed to seed the shuffling procedure
+    np.random.seed(seed)
 
     epochs = config["epochs"]
 
@@ -137,14 +138,18 @@ def optim_fn(optim_config):
 
 def dataset_fn(dataset_config, seed):
     dataset_name = dataset_config["type"]
-    return get_data(dataset_name, seed)
+    return get_data(dataset_name, dataset_config, seed)
 
 
-def record_metrics(type_, state, datasets_for_labels, data):
+def record_metrics(type_, state, full_dataset, datasets_for_labels, data):
+    ####################################################################
+    # Compute metrics for each separate label
+    ####################################################################
     for label in range(len(datasets_for_labels)):
         ds = datasets_for_labels[label]
         if len(ds) == 0:
             continue
+
         dl = loader.NumpyLoader(ds, batch_size=len(ds), shuffle=False)
 
         # Compute label metrics
@@ -153,9 +158,27 @@ def record_metrics(type_, state, datasets_for_labels, data):
             state = compute_metrics(state=state, batch=batch)
             for metric, value in state.metrics.compute().items():
                 key = f"{type_}_{metric}"
-                data[key][label].append(value.item())
+                data[key]["label-by-label"][label].append(value.item())
 
             state = state.replace(metrics=state.metrics.empty())
+    ####################################################################
+
+    ####################################################################
+    # Compute metrics for all labels/combined dataset
+    ####################################################################
+    dl = loader.NumpyLoader(
+        full_dataset, batch_size=len(full_dataset), shuffle=False,
+    )
+
+    # Compute label metrics
+    for x_batch, y_batch in dl:
+        batch = {"inputs": x_batch, "labels": y_batch}
+        state = compute_metrics(state=state, batch=batch)
+        for metric, value in state.metrics.compute().items():
+            key = f"{type_}_{metric}"
+            data[key]["combined"].append(value.item())
+
+        state = state.replace(metrics=state.metrics.empty())
 
     return state.replace(metrics=state.metrics.empty())
 
@@ -185,7 +208,11 @@ def experiment_loop(
     for type_ in ("train", "test", "valid"):
         for metric in state.metrics.keys():
             key = f"{type_}_{metric}"
-            data[key] = [[] for _ in range(train_ds.n_classes)]
+            data[key] = {}
+            data[key]["label-by-label"] = [
+                [] for _ in range(train_ds.n_classes)
+            ]
+            data[key]["combined"] = []
 
     train_datasets_for_labels = tuple(
         train_ds.get_dataset_for(label)
@@ -201,9 +228,15 @@ def experiment_loop(
     )
 
     # Record performance before training
-    state = record_metrics("train", state, train_datasets_for_labels, data)
-    state = record_metrics("test", state, test_datasets_for_labels, data)
-    state = record_metrics("valid", state, valid_datasets_for_labels, data)
+    state = record_metrics(
+        "train", state, train_ds, train_datasets_for_labels, data,
+    )
+    state = record_metrics(
+        "test", state, test_ds, test_datasets_for_labels, data,
+    )
+    state = record_metrics(
+        "valid", state, valid_ds, valid_datasets_for_labels, data,
+    )
 
     for epoch in range(epochs):
         print(f"epoch {epoch} completed")
@@ -217,11 +250,31 @@ def experiment_loop(
             state = state.replace(params=post_params)
 
         # Record performance at the end of each epoch
-        state = record_metrics("train", state, train_datasets_for_labels, data)
-        state = record_metrics("test", state, test_datasets_for_labels, data)
-        state = record_metrics("valid", state, valid_datasets_for_labels, data)
+        state = record_metrics(
+            "train", state, train_ds, train_datasets_for_labels, data,
+        )
+        state = record_metrics(
+            "test", state, test_ds, test_datasets_for_labels, data,
+        )
+        state = record_metrics(
+            "valid", state, valid_ds, valid_datasets_for_labels, data,
+        )
 
     data["total_time"] = time.time() - start_time
     data["model"] = state
+
+#     # print(data["train_accuracy"])
+#     # print(data["valid_accuracy"])
+#     # print()
+#     # for i in range(4):
+#     #     print(data["train_accuracy"][i][-3:])
+#     #     print(data["valid_accuracy"][i][-3:])
+#     #     print()
+#     print()
+#     print()
+#     print()
+#     print(data["valid_confusion"]["label-by-label"][1])
+#     print(len(data["valid_confusion"]["combined"]))
+#     print()
 
     return data

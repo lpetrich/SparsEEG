@@ -2,14 +2,15 @@ train_percent: 0.8
 valid_percent: 0.1
 epochs: 500
 seed: [0, 1, 2]
-save_dir: "dense_500epochs"
+save_dir: "dense_500epochs_6subject"
 dataset:
   type: "WAYEEGGALDataset-Low"
   batch_size: 0
   shuffle: true
+  n_subjects: 6
 model:
   type: "DenseMLP"
-  hidden_layers: [[256, 256], [512, 512], [1024, 1024]]
+  hidden_layers: [[1024, 1024]]
   activations: [["relu", "relu"]]
   optim:
     type: "adam"
