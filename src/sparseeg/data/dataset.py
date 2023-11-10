@@ -115,14 +115,17 @@ class WAYEEGGALDataset(Dataset):
         print(f"Initializing WAL-EEG-GAL Dataset of type: {Dataset}")
 
         # Get the number of subjects whose data to include
-        n = config["n_subjects"]
-        assert n > 0
         rng = np.random.default_rng(seed=seed)
         self._rng = rng
-        subjects = self._rng.choice(range(1, 13), n, replace=False)
+        if "n_subjects" in config.keys():
+            n = config["n_subjects"]
+            assert n > 0
+            subjects = self._rng.choice(range(1, 13), n, replace=False)
+        elif "subjects" in config.keys():
+            subjects = config["subjects"]
 
         # Load first subject's data
-        self.x_samples, self.y_samples = self._load_subject_data(1)
+        self.x_samples, self.y_samples = self._load_subject_data(subjects[0])
 
         # Load next subjects' data and randomly subsample as above
         for subject in subjects[1:]:
