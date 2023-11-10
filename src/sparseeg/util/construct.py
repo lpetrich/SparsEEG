@@ -74,7 +74,7 @@ def optim(type_: str, config: dict):
 
     if type_ in ("adam", "rmsprop", "adagrad", "sgd"):
         return None, _optim_optax(type_, config)
-    elif type_ in ("set"):
+    elif type_ in ("set", "magnitudepruning"):
         sparsity_updater = _optim_jaxpruner(type_, config)
 
         wrapped_config = config["wrapped"]
@@ -88,10 +88,10 @@ def optim(type_: str, config: dict):
 
 def _optim_jaxpruner(type_: str, config: dict):
     config = deepcopy(config)  # To avoid silent mutations
-    if type_ == "set":
-        args = config["args"]
-        kwargs = config["kwargs"]
+    args = config["args"]
+    kwargs = config["kwargs"]
 
+    if type_ == "set":
         # Create the sparsity distribution
         dist_config = kwargs["sparsity_distribution_fn"]
         kwargs["sparsity_distribution_fn"] = _jaxpruner_sparsity_dist(
