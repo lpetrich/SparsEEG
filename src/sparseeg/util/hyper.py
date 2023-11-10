@@ -1,3 +1,4 @@
+from copy import deepcopy
 import os
 import fnmatch
 import yaml
@@ -8,13 +9,31 @@ import numpy as np
 import warnings
 
 
-def get(data, hyper, key):
+def satisfies(data, f):
+    out_keys = []
+    for hyper in data:
+        if f(data[hyper]["config"]):
+            out_keys.append(int(hyper))
+
+    out = {}
+    out_keys = sorted(out_keys)
+    print(out_keys)
+    for i, k in enumerate(out_keys):
+        print(i, k)
+        out[str(i)] = deepcopy(data[str(k)])
+
+    return out
+
+
+def get(data, hyper, key, combined):
     hyper = str(hyper)
+
+    subkey = "combined" if combined else "label-by-label"
 
     seed_data = []
     new_data = data[hyper]["data"]
     for seed in new_data:
-        seed_data.append(new_data[seed][key])
+        seed_data.append(new_data[seed][key][subkey])
 
     out = np.array(seed_data)
     if out.ndim == 1:
@@ -31,7 +50,7 @@ def best(perfs, agg, reverse=False):
         return np.argmax(perfs)
 
 
-def perfs(data, tune_by, inner_agg, outer_agg):
+def perfs(data, tune_by, inner_agg, outer_agg, combined):
     hyper_perfs = [[] for _ in range(len(data.keys()))]
     keys = list(map(lambda x: int(x), data.keys()))
     keys = list(map(lambda x: str(x), sorted(keys)))
@@ -39,7 +58,10 @@ def perfs(data, tune_by, inner_agg, outer_agg):
         hyper = str(hyper)
         seed_data = []
         for seed in data[hyper]["data"]:
-            d = data[hyper]["data"][seed][tune_by]
+            if combined:
+                d = data[hyper]["data"][seed][tune_by]["combined"]
+            else:
+                d = data[hyper]["data"][seed][tune_by]["label-by-label"]
             label_data = []
             for i, label in enumerate(d):
                 label_data.append(inner_agg(label))
@@ -73,26 +95,6 @@ def renumber(data, indices):
         new_config.update(data[i]["config"])
 
     return new_d
-
-
-def satisfies(data, config, f):
-    new_config = deepcopy(config)
-
-    # Clear the config, just keeping the structure
-    for key in new_config:
-        if isinstance(new_config[key], list):
-            new_config[key] = set()
-
-    indices = []
-    for index in data.keys():
-        hypers = data[index]["config"]
-        if not f(hypers):
-            continue
-
-        # Track the hyper indices and full hyper settings
-        indices.append(index)
-
-    return indices
 
 
 def index_of(config, setting, ignore=["seed"]):
