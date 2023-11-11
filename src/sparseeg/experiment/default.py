@@ -1,3 +1,4 @@
+import chex
 from functools import partial
 import numpy as np
 import jaxpruner
@@ -28,6 +29,41 @@ from math import gcd
 import warnings
 
 
+@struct.dataclass
+class WeightedSoftmaxCrossEntropyWithIntegerLabels:
+    label_weights: jnp.ndarray
+
+    @classmethod
+    def weights(cls, train_ds):
+        labels = train_ds.classes
+        n_label_samples = jnp.array([
+            jnp.sum(train_ds.y_samples == lab) for lab in labels
+        ])
+
+        return n_label_samples / sum(n_label_samples)
+
+    def compute(
+        self,
+        logits: chex.Array,
+        labels: chex.Array,
+    ) -> chex.Array:
+        chex.assert_type([logits], float)
+        chex.assert_type([labels], int)
+
+        weights = self.label_weights[labels]
+
+        # This is like jnp.take_along_axis(jax.nn.log_softmax(...), ...) except
+        # that we avoid subtracting the normalizer from all values, just from
+        # the values for the correct labels.
+        logits_max = jnp.max(logits, axis=-1, keepdims=True)
+        logits -= jax.lax.stop_gradient(logits_max)
+        label_logits = jnp.take_along_axis(
+            logits, labels[..., None], axis=-1,
+        )[..., 0]
+        log_normalizers = jnp.log(jnp.sum(jnp.exp(logits), axis=-1))
+        return weights * (log_normalizers - label_logits)
+
+
 def get_data(identifier, config, seed):
     return dataset.load(identifier, config, seed)
 
@@ -44,10 +80,13 @@ class Metrics(training_state.MetricsCollection):
     loss_std: metrics.Std.from_output("loss")
 
 
-@jit
-def compute_metrics(*, state, batch):
+@partial(jit, static_argnames=("loss_fn"))
+def compute_metrics(*, state, batch, loss_fn):
     logits = state.apply_fn({'params': state.params}, batch['inputs'])
-    loss = optax.softmax_cross_entropy_with_integer_labels(
+    # loss = optax.softmax_cross_entropy_with_integer_labels(
+    #     logits=logits, labels=batch['labels']
+    # ).mean()
+    loss = loss_fn(
         logits=logits, labels=batch['labels']
     ).mean()
     labels = jnp.array(batch["labels"], dtype=jnp.int32)
@@ -141,7 +180,9 @@ def dataset_fn(dataset_config, seed):
     return get_data(dataset_name, dataset_config, seed)
 
 
-def record_metrics(type_, state, full_dataset, datasets_for_labels, data):
+def record_metrics(
+    type_, state, full_dataset, datasets_for_labels, data, loss_fn,
+):
     ####################################################################
     # Compute metrics for each separate label
     ####################################################################
@@ -155,7 +196,9 @@ def record_metrics(type_, state, full_dataset, datasets_for_labels, data):
         # Compute label metrics
         for x_batch, y_batch in dl:
             batch = {"inputs": x_batch, "labels": y_batch}
-            state = compute_metrics(state=state, batch=batch)
+            state = compute_metrics(
+                state=state, batch=batch, loss_fn=loss_fn,
+            )
             for metric, value in state.metrics.compute().items():
                 key = f"{type_}_{metric}"
                 data[key]["label-by-label"][label].append(value.item())
@@ -173,7 +216,9 @@ def record_metrics(type_, state, full_dataset, datasets_for_labels, data):
     # Compute label metrics
     for x_batch, y_batch in dl:
         batch = {"inputs": x_batch, "labels": y_batch}
-        state = compute_metrics(state=state, batch=batch)
+        state = compute_metrics(
+            state=state, batch=batch, loss_fn=loss_fn,
+        )
         for metric, value in state.metrics.compute().items():
             key = f"{type_}_{metric}"
             data[key]["combined"].append(value.item())
@@ -204,6 +249,17 @@ def experiment_loop(
     )
     del init_rng
 
+    # TODO: use this loss function when computing metrics and when stepping the
+    # model! Everywhere we use optax.softmax_cross_entropy_with_integer_labels,
+    # we should replace with a call to a function argument where the loss is
+    # passed in. That way, we can pass in
+    # optax.softmax_cross_entropy_with_integer_labels or this weighted loss
+    # class/function instead!
+    weights = WeightedSoftmaxCrossEntropyWithIntegerLabels.weights(
+        train_ds,
+    )
+    loss = WeightedSoftmaxCrossEntropyWithIntegerLabels(weights)
+
     data = {}
     for type_ in ("train", "test", "valid"):
         for metric in state.metrics.keys():
@@ -230,12 +286,15 @@ def experiment_loop(
     # Record performance before training
     state = record_metrics(
         "train", state, train_ds, train_datasets_for_labels, data,
+        loss.compute,
     )
     state = record_metrics(
         "test", state, test_ds, test_datasets_for_labels, data,
+        loss.compute,
     )
     state = record_metrics(
         "valid", state, valid_ds, valid_datasets_for_labels, data,
+        loss.compute,
     )
 
     for epoch in range(epochs):
@@ -244,7 +303,11 @@ def experiment_loop(
         for x_batch, y_batch in train_dl:
             train_batch = {"inputs": x_batch, "labels": y_batch}
 
-            state = training_state.step(state, train_batch)
+            state = training_state.step(
+                state,
+                train_batch,
+                loss.compute,
+            )
 
             post_params = state.update_sparsity()
             state = state.replace(params=post_params)
@@ -252,12 +315,15 @@ def experiment_loop(
         # Record performance at the end of each epoch
         state = record_metrics(
             "train", state, train_ds, train_datasets_for_labels, data,
+            loss.compute,
         )
         state = record_metrics(
             "test", state, test_ds, test_datasets_for_labels, data,
+            loss.compute,
         )
         state = record_metrics(
             "valid", state, valid_ds, valid_datasets_for_labels, data,
+            loss.compute,
         )
 
     data["total_time"] = time.time() - start_time
