@@ -35,12 +35,12 @@ class WeightedSoftmaxCrossEntropyWithIntegerLabels:
 
     @classmethod
     def weights(cls, train_ds):
-        labels = train_ds.classes
-        n_label_samples = jnp.array([
-            jnp.sum(train_ds.y_samples == lab) for lab in labels
-        ])
+        n_classes = train_ds.n_classes
+        y_samples = train_ds.y_samples
+        n_samples = len(y_samples)
 
-        return n_label_samples / sum(n_label_samples)
+        # https://scikit-learn.org/stable/modules/generated/sklearn.svm.SVC.html
+        return n_samples / (n_classes * jnp.bincount(y_samples))
 
     def compute(
         self,
@@ -132,6 +132,8 @@ def main_experiment(config, save_file, verbose=False):
 
     epochs = config["epochs"]
 
+    weighted_loss = config["weighted_loss"]
+
     train_percent = config["train_percent"]
     valid_percent = config["valid_percent"]
 
@@ -154,9 +156,10 @@ def main_experiment(config, save_file, verbose=False):
     trainer = TTVSplitTrainer(
         experiment_loop, config, model_fn, optim_fn, dataset_fn, batch_size,
         shuffle, dataset.StratifiedTTV, train_percent, valid_percent,
+
     )
 
-    data = trainer.run(seed, epochs, verbose)
+    data = trainer.run(seed, epochs, weighted_loss, verbose)
     return {"data": data, "config": config}
 
 
@@ -236,7 +239,7 @@ def record_metrics(
 # only caching on a fold-by-fold basis, and we can easily re-get these folds
 def experiment_loop(
     cv, seed, epochs, model, optim, train_ds, train_dl, test_ds,
-    valid_ds, verbose=False,
+    valid_ds, weighted_loss=True, verbose=False,
 ):
     assert train_ds.n_classes == test_ds.n_classes
     assert train_ds.n_classes == valid_ds.n_classes
@@ -255,10 +258,15 @@ def experiment_loop(
     # passed in. That way, we can pass in
     # optax.softmax_cross_entropy_with_integer_labels or this weighted loss
     # class/function instead!
-    weights = WeightedSoftmaxCrossEntropyWithIntegerLabels.weights(
-        train_ds,
-    )
-    loss = WeightedSoftmaxCrossEntropyWithIntegerLabels(weights)
+    if weighted_loss:
+        weights = WeightedSoftmaxCrossEntropyWithIntegerLabels.weights(
+            train_ds,
+        )
+        loss = WeightedSoftmaxCrossEntropyWithIntegerLabels(
+            weights,
+        ).compute
+    else:
+        loss = optax.softmax_cross_entropy_with_integer_labels
 
     data = {}
     for type_ in ("train", "test", "valid"):
@@ -286,15 +294,15 @@ def experiment_loop(
     # Record performance before training
     state = record_metrics(
         "train", state, train_ds, train_datasets_for_labels, data,
-        loss.compute,
+        loss,
     )
     state = record_metrics(
         "test", state, test_ds, test_datasets_for_labels, data,
-        loss.compute,
+        loss,
     )
     state = record_metrics(
         "valid", state, valid_ds, valid_datasets_for_labels, data,
-        loss.compute,
+        loss,
     )
 
     for epoch in range(epochs):
@@ -306,7 +314,7 @@ def experiment_loop(
             state = training_state.step(
                 state,
                 train_batch,
-                loss.compute,
+                loss,
             )
 
             post_params = state.update_sparsity()
@@ -315,15 +323,15 @@ def experiment_loop(
         # Record performance at the end of each epoch
         state = record_metrics(
             "train", state, train_ds, train_datasets_for_labels, data,
-            loss.compute,
+            loss,
         )
         state = record_metrics(
             "test", state, test_ds, test_datasets_for_labels, data,
-            loss.compute,
+            loss,
         )
         state = record_metrics(
             "valid", state, valid_ds, valid_datasets_for_labels, data,
-            loss.compute,
+            loss,
         )
 
     data["total_time"] = time.time() - start_time

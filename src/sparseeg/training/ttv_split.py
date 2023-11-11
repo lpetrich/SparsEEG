@@ -65,7 +65,7 @@ class TTVSplitTrainer:
 
         return train_ds, train_dl, test_ds, valid_ds
 
-    def run(self, seed, epochs, verbose=False):
+    def run(self, seed, epochs, weighted_loss, verbose=False):
         key = f"seed_{seed}"
 
         ds = self._dataset_fn(self._dataset_config, seed)
@@ -79,7 +79,7 @@ class TTVSplitTrainer:
 
         data = self.experiment_loop(
             self, seed, epochs, model, optim, train_ds, train_dl,
-            test_ds, valid_ds, verbose=verbose,
+            test_ds, valid_ds, weighted_loss, verbose=verbose,
         )
 
         self._save_data[key] = data
