@@ -61,7 +61,10 @@ def run(experiment_file, config_file, index, save_at):
     save_at = os.path.join(save_at, config["save_dir"])
     save_file = os.path.join(save_at, f"{index}.pkl")
     if not os.path.isdir(save_at):
-        os.makedirs(save_at)
+        try:
+            os.makedirs(save_at)
+        except FileExistsError:
+            pass
     if os.path.exists(save_file):
         new_file = save_file + f".old_{int(time())}"
         os.rename(save_file, new_file)
