@@ -23,8 +23,6 @@ import sparseeg.training.state as training_state
 from sparseeg.training.ttv_split import TTVSplitTrainer
 import sparseeg.util.construct as construct
 
-from tqdm import tqdm
-
 import flax.linen as nn
 import torch
 from math import gcd
