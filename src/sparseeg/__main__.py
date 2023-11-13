@@ -3,13 +3,17 @@
 Entry module for this package
 
 You can run this package with
-    python -m sparseeg -s "SAVE_DIR" -i "INT" default.py dense.yaml 
+    python -m sparseeg -s "SAVE_DIR" -i "INT" default.py dense.yaml
 """
 
 from importlib import import_module
 
 import sparseeg
 
+from time import time
+import orbax
+import flax
+from flax.training import orbax_utils
 import click
 import os
 import pickle
@@ -17,8 +21,11 @@ import sparseeg.util.hyper as hyper
 import yaml
 
 
+# Use orbax for model saving
+flax.config.update('flax_use_orbax_checkpointing', True)
+
+
 @click.command()
-# changed to default string type argument because we don't want to have to type in the full path now
 @click.argument("experiment_file")
 @click.argument("config_file")
 @click.option(
@@ -27,7 +34,6 @@ import yaml
 @click.option(
     "-s", "--save_at", type=click.Path(), help="path to save data at",
 )
-
 def run(experiment_file, config_file, index, save_at):
     # First check that config and experiment files exist
     fpath = "./src/sparseeg"
@@ -42,7 +48,8 @@ def run(experiment_file, config_file, index, save_at):
     # Parse config file
     with open(config_path, "r") as infile:
         config = yaml.safe_load(infile)
-    config = hyper.sweeps(config, index)
+        full_config = config
+    config, _ = hyper.sweeps(config, index)
 
     # Import the experiment module
     # experiment_module_name = experiment_file.replace("/", ".")
@@ -50,15 +57,27 @@ def run(experiment_file, config_file, index, save_at):
     experiment_module_name = f"sparseeg.experiment.{experiment_module_name}"
     globals()["experiment_module"] = import_module(experiment_module_name)
 
-    # Run the experiment
-    data = experiment_module.main_experiment(config)
-
-    # Save output data here
+    # Create save directory
+    save_at = os.path.join(save_at, config["save_dir"])
+    save_file = os.path.join(save_at, f"{index}.pkl")
     if not os.path.isdir(save_at):
         os.makedirs(save_at)
-    save_file = os.path.join(save_at, f"{index}.pkl")
-    with open(save_file, "wb") as outfile:
-        pickle.dump(data, outfile)
+    if os.path.exists(save_file):
+        new_file = save_file + f".old_{int(time())}"
+        os.rename(save_file, new_file)
+
+    # Run the experiment
+    data = experiment_module.main_experiment(config, save_file)
+    data = {hyper.index_of(full_config, config): data}
+
+    # # Save output data with orbax
+    orbax_checkpointer = orbax.checkpoint.PyTreeCheckpointer()
+    save_args = orbax_utils.save_args_from_target(data)
+    print(f"Saving at {save_file}")
+    orbax_checkpointer.save(
+        save_file, data, save_args=save_args
+    )
+    print(f"Saved")
 
 
 if __name__ == "__main__":

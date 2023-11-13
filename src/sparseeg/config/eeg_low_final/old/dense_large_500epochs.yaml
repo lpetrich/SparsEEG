@@ -1,0 +1,18 @@
+train_percent: 0.8
+valid_percent: 0.1
+epochs: 500
+seed: 0
+save_dir: "dense_large_500epochs_low"
+dataset:
+  type: "WAYEEGGALDataset-Low"
+  batch_size: 32
+  shuffle: true
+model:
+  type: "DenseMLP"
+  hidden_layers: [[128, 128], [256, 256], [512, 512]]
+  activations: [["relu", "relu"]]
+  optim:
+    type: "adam"
+    args: [[]]
+    kwargs:
+      learning_rate: [0.01, 0.001]

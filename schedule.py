@@ -58,11 +58,11 @@ def getJobScript(parallel, num_gpu):
 {gpus}
 
 cd {cwd}
-module load python/3.9
+module load python/3.10
 module load cuda
 module load cudnn/8.0.3
 
-source ~/py3_9/bin/activate
+source ~/py3_10/bin/activate
 
 export MPLBACKEND=TKAgg
 export OMP_NUM_THREADS=1
@@ -101,6 +101,7 @@ def gatherMissing(
 
     with open(config_file, "r") as infile:
         config = yaml.safe_load(infile)
+    save_path = os.path.join(save_path, config["save_dir"])
 
     if not os.path.exists(save_path):
         to_run = sorted(range(total(config)))
