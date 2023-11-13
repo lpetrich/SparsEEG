@@ -120,9 +120,11 @@ class WAYEEGGALDataset(Dataset):
         if "n_subjects" in config.keys():
             n = config["n_subjects"]
             assert n > 0
-            subjects = self._rng.choice(range(1, 13), n, replace=False)
+            subjects = self._rng.choice(range(1, 11), n, replace=False)
         elif "subjects" in config.keys():
             subjects = config["subjects"]
+
+        print(f"Using data from subjects {subjects}")
 
         # Load first subject's data
         self.x_samples, self.y_samples = self._load_subject_data(subjects[0])

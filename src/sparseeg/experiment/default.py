@@ -23,6 +23,8 @@ import sparseeg.training.state as training_state
 from sparseeg.training.ttv_split import TTVSplitTrainer
 import sparseeg.util.construct as construct
 
+from tqdm import tqdm
+
 import flax.linen as nn
 import torch
 from math import gcd
@@ -306,7 +308,8 @@ def experiment_loop(
     )
 
     for epoch in range(epochs):
-        print(f"epoch {epoch} completed")
+        _start_time = time.time()
+        print(f"epoch {epoch} started: {_start_time}")
         # Train for one epoch
         for x_batch, y_batch in train_dl:
             train_batch = {"inputs": x_batch, "labels": y_batch}
@@ -333,6 +336,7 @@ def experiment_loop(
             "valid", state, valid_ds, valid_datasets_for_labels, data,
             loss,
         )
+        print(f"epoch {epoch} ended: {time.time() - _start_time}")
 
     data["total_time"] = time.time() - start_time
     data["model"] = state
