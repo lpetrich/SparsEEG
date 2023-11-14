@@ -6,7 +6,7 @@ seed: [0, 1, 2]
 save_dir: "dense_500epochs_3subject_weighted"
 dataset:
   type: "WAYEEGGALDataset-Low"
-  batch_size: [8192]
+  batch_size: [0, 8192]
   shuffle: true
   n_subjects: 3
 model:

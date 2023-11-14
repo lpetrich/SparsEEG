@@ -29,7 +29,14 @@ def combine(dir, config, filename, force, ignore):
         config = yaml.safe_load(infile)
 
     data_dir = os.path.join(dir, config["save_dir"])
+    print("Combining data in", data_dir)
+
+    filename = os.path.join(data_dir, filename)
+    if os.path.exists(filename) and not force:
+        raise ValueError(f"{filename} exists, use -f/--force to overwrite")
+
     files = os.listdir(data_dir)
+    print("Files:", files)
     files = list(map(lambda f: os.path.join(data_dir, f), files))
     files = fnmatch.filter(files, "*.pkl")
 
@@ -38,10 +45,6 @@ def combine(dir, config, filename, force, ignore):
     for f in tqdm(files):
         d = chptr.restore(f)
         all_data = _combine(all_data, d, config, ignore)
-
-    filename = os.path.join(data_dir, filename)
-    if os.path.exists(filename) and not force:
-        raise ValueError(f"{filename} exists, use -f/--force to overwrite")
 
     save_args = orbax_utils.save_args_from_target(all_data)
     chptr.save(filename, all_data, save_args=save_args)

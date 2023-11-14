@@ -19,7 +19,7 @@ model:
     kwargs:
       scheduler:
         type: "OneShotSchedule"
-        args: [[167], [333], [400]]
+        args: [[167], [333], [400]] # epochs
         kwargs: {}
       sparsity_distribution_fn:
         type: "erk"

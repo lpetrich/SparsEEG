@@ -25,7 +25,7 @@ model:
         type: "PeriodicSchedule"
         args: []
         kwargs:
-          update_freq: [25, 50, 75]
+          update_freq: [1, 2, 5] # epochs
           update_start_step: 0
           update_end_step: null
       sparsity_distribution_fn:
