@@ -47,6 +47,7 @@ def create(module, rng, metrics_type, dummy_input, opt):
     )
 
 
+# @jit
 @partial(jit, static_argnames=("loss_fn"))
 def step(state, batch, loss_fn):
     def _loss_fn(params):

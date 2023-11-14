@@ -80,12 +80,10 @@ class Metrics(training_state.MetricsCollection):
     loss_std: metrics.Std.from_output("loss")
 
 
+# @jit
 @partial(jit, static_argnames=("loss_fn"))
 def compute_metrics(*, state, batch, loss_fn):
     logits = state.apply_fn({'params': state.params}, batch['inputs'])
-    # loss = optax.softmax_cross_entropy_with_integer_labels(
-    #     logits=logits, labels=batch['labels']
-    # ).mean()
     loss = loss_fn(
         logits=logits, labels=batch['labels']
     ).mean()
@@ -318,8 +316,9 @@ def experiment_loop(
                 loss,
             )
 
-            post_params = state.update_sparsity()
-            state = state.replace(params=post_params)
+        # Update sparsity
+        post_params = state.update_sparsity()
+        state = state.replace(params=post_params)
 
         # Record performance at the end of each epoch
         state = record_metrics(
@@ -334,23 +333,10 @@ def experiment_loop(
             "valid", state, valid_ds, valid_datasets_for_labels, data,
             loss,
         )
+
         print(f"epoch {epoch} ended: {time.time() - _start_time}")
 
     data["total_time"] = time.time() - start_time
     data["model"] = state
-
-#     # print(data["train_accuracy"])
-#     # print(data["valid_accuracy"])
-#     # print()
-#     # for i in range(4):
-#     #     print(data["train_accuracy"][i][-3:])
-#     #     print(data["valid_accuracy"][i][-3:])
-#     #     print()
-#     print()
-#     print()
-#     print()
-#     print(data["valid_confusion"]["label-by-label"][1])
-#     print(len(data["valid_confusion"]["combined"]))
-#     print()
 
     return data
