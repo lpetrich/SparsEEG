@@ -23,7 +23,7 @@ model:
         kwargs: {}
       sparsity_distribution_fn:
         type: "erk"
-        kwargs: {"sparsity": 0.25, "sparsity": 0.5}
+        kwargs: [{"sparsity": 0.25}, {"sparsity": 0.5}]
     wrapped:
       type: "adam"
       args: [[]]
