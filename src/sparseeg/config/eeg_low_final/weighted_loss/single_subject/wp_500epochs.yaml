@@ -1,0 +1,31 @@
+train_percent: [0.1, 0.2, 0.3, 0.5, 0.7, 0.8]
+valid_percent: 0.1
+weighted_loss: true
+epochs: 500
+seed: [0, 1, 2]
+save_dir: "single_subject_weight_pruning_500epochs_weighted"
+dataset:
+  type: "WAYEEGGALDataset-Low"
+  batch_size: [8192]
+  shuffle: true
+  n_subjects: 1
+model:
+  type: "DenseMLP"
+  hidden_layers: [[1024, 1024]]
+  activations: [["relu", "relu"]]
+  optim:
+    type: "MagnitudePruning"
+    args: [[]]
+    kwargs:
+      scheduler:
+        type: "OneShotSchedule"
+        args: [[167], [333], [400]] # epochs
+        kwargs: {}
+      sparsity_distribution_fn:
+        type: "erk"
+        kwargs: [{"sparsity": 0.25}, {"sparsity": 0.5}]
+    wrapped:
+      type: "adam"
+      args: [[]]
+      kwargs:
+        learning_rate: [0.01, 0.001, 0.0001]
