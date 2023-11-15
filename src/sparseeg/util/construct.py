@@ -174,8 +174,8 @@ def _jaxpruner_scheduler(config, batch_size, ds_size):
             epochs = args[0]
             args[0] *= int(ds_size / batch_size)
         print(
-            f"Sparsity updating every {epochs} epochs = {args[0]} " + "
-            gradient steps",
+            f"Sparsity updating every {epochs} epochs = {args[0]} " +
+            "gradient steps",
         )
         return jaxpruner.OneShotSchedule(*args, **kwargs)
     elif type_ == "noupdateschedule":

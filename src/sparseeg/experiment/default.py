@@ -76,8 +76,8 @@ def get_data(identifier, config, seed):
 @struct.dataclass
 class Metrics(training_state.MetricsCollection):
     accuracy: metrics.Accuracy
-    # loss_mean: metrics.Average.from_output("loss")
-    # loss_std: metrics.Std.from_output("loss")
+    loss_mean: metrics.Average.from_output("loss")
+    loss_std: metrics.Std.from_output("loss")
 
 
 # @jit

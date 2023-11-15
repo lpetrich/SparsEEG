@@ -3,7 +3,7 @@
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=4
 #SBATCH --mem-per-cpu=4Gb
-#SBATCH --time=02:10:00
+#SBATCH --time=03:00:00
 #SBATCH --account=def-whitem
 #SBATCH -e err/%x_%j_%a.err
 #SBATCH -o out/%x_%j_%a.out

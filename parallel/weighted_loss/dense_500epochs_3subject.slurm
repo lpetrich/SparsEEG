@@ -7,7 +7,7 @@
 #SBATCH --account=def-whitem
 #SBATCH -e err/%x_%j_%a.err
 #SBATCH -o out/%x_%j_%a.out
-#SBATCH --array=0,6,12
+#SBATCH --array=0-17
 
 module load python/3.10
 source ./venv/bin/activate
