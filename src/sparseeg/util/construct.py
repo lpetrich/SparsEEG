@@ -69,13 +69,13 @@ def _construct_dense_mlp(
 
 
 # Returns (sparsity wrapper, optimiser)
-def optim(type_: str, config: dict):
+def optim(type_: str, config: dict, batch_size: int, ds_size: int):
     type_ = type_.lower()
 
     if type_ in ("adam", "rmsprop", "adagrad", "sgd"):
         return None, _optim_optax(type_, config)
     elif type_ in ("set", "magnitudepruning"):
-        sparsity_updater = _optim_jaxpruner(type_, config)
+        sparsity_updater = _optim_jaxpruner(type_, config, batch_size, ds_size)
 
         wrapped_config = config["wrapped"]
         wrapped_type = wrapped_config["type"].lower()
@@ -86,7 +86,7 @@ def optim(type_: str, config: dict):
         raise NotImplementedError(f"optim {type_} not implemented")
 
 
-def _optim_jaxpruner(type_: str, config: dict):
+def _optim_jaxpruner(type_: str, config: dict, batch_size, ds_size):
     config = deepcopy(config)  # To avoid silent mutations
     args = config["args"]
     kwargs = config["kwargs"]
@@ -100,7 +100,9 @@ def _optim_jaxpruner(type_: str, config: dict):
 
         # Create the schedule at which we induce sparsity
         schedule_config = kwargs["scheduler"]
-        kwargs["scheduler"] = _jaxpruner_scheduler(schedule_config)
+        kwargs["scheduler"] = _jaxpruner_scheduler(
+            schedule_config, batch_size, ds_size
+        )
 
         if "drop_fraction_fn" in kwargs.keys():
             kwargs["drop_fraction_fn"] = eval(kwargs["drop_fraction_fn"])
@@ -116,7 +118,9 @@ def _optim_jaxpruner(type_: str, config: dict):
 
         # Create the schedule at which we induce sparsity
         schedule_config = kwargs["scheduler"]
-        kwargs["scheduler"] = _jaxpruner_scheduler(schedule_config)
+        kwargs["scheduler"] = _jaxpruner_scheduler(
+            schedule_config, batch_size, ds_size
+        )
 
         return jaxpruner.MagnitudePruning(*args, **kwargs)
 
@@ -150,18 +154,32 @@ def _jaxpruner_sparsity_dist(config):
         raise NotImplementedError(f"sparisty dist {type_} not implemented")
 
 
-def _jaxpruner_scheduler(config):
+def _jaxpruner_scheduler(config, batch_size, ds_size):
     type_ = config["type"].lower()
     args = config["args"]
     kwargs = config["kwargs"]
     if type_ == "periodicschedule":
+        if batch_size > 0:
+            # Adjust for batch size/epochs
+            epochs = kwargs["update_freq"]
+            kwargs["update_freq"] *= int(ds_size / batch_size)
+        print(
+            f"Sparsity updating every {epochs} epochs " +
+            f"= {kwargs['update_freq']} gradient steps",
+        )
         return jaxpruner.PeriodicSchedule(*args, **kwargs)
     elif type_ == "oneshotschedule":
+        if batch_size > 0:
+            # Adjust for batch size/epochs
+            epochs = args[0]
+            args[0] *= int(ds_size / batch_size)
+        print(
+            f"Sparsity updating every {epochs} epochs = {args[0]} " + "
+            gradient steps",
+        )
         return jaxpruner.OneShotSchedule(*args, **kwargs)
     elif type_ == "noupdateschedule":
         return jaxpruner.NoUpdateShotSchedule(*args, **kwargs)
-    elif type_ == "polynomialschedule":
-        return jaxpruner.PolynomialSchedule(*args, **kwargs)
     else:
         raise NotImplementedError(f"schedule {type_} not implemented")
 

@@ -115,6 +115,9 @@ class WAYEEGGALDataset(Dataset):
         print(f"Initializing WAL-EEG-GAL Dataset of type: {Dataset}")
 
         # Get the number of subjects whose data to include
+        print("=====================")
+        print(f"Using seed: {seed}")
+        print("=====================")
         rng = np.random.default_rng(seed=seed)
         self._rng = rng
         if "n_subjects" in config.keys():

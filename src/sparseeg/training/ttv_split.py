@@ -22,8 +22,9 @@ class TTVSplitTrainer:
     def __init__(
         self, experiment_loop, config, model_fn,
         optim_fn, dataset_fn, batch_size, shuffle, splitter, train_percent,
-        valid_percent,
+        valid_percent, record_every,
     ):
+        self._record_every = record_every
         self.experiment_loop = experiment_loop
 
         self._model_config = config["model"]
@@ -75,11 +76,18 @@ class TTVSplitTrainer:
         model = self._model_fn(
             self._model_config, seed, train_ds,
         )
-        optim = self._optim_fn(self._optim_config)
+
+        batch_size, _ = adjust_for_batch_size(
+            self._batch_size, train_ds,
+        )
+        optim = self._optim_fn(
+            self._optim_config, batch_size, len(train_ds),
+        )
 
         data = self.experiment_loop(
             self, seed, epochs, model, optim, train_ds, train_dl,
-            test_ds, valid_ds, weighted_loss, verbose=verbose,
+            test_ds, valid_ds, self._record_every, weighted_loss,
+            verbose=verbose,
         )
 
         self._save_data[key] = data

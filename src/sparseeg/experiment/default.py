@@ -76,8 +76,8 @@ def get_data(identifier, config, seed):
 @struct.dataclass
 class Metrics(training_state.MetricsCollection):
     accuracy: metrics.Accuracy
-    loss_mean: metrics.Average.from_output("loss")
-    loss_std: metrics.Std.from_output("loss")
+    # loss_mean: metrics.Average.from_output("loss")
+    # loss_std: metrics.Std.from_output("loss")
 
 
 # @jit
@@ -151,10 +151,12 @@ def main_experiment(config, save_file, verbose=False):
 
     dataset_name = dataset_config["type"]
 
+    record_every = config.get("record_every", 5)
+
     trainer = TTVSplitTrainer(
         experiment_loop, config, model_fn, optim_fn, dataset_fn, batch_size,
         shuffle, dataset.StratifiedTTV, train_percent, valid_percent,
-
+        record_every,
     )
 
     data = trainer.run(seed, epochs, weighted_loss, verbose)
@@ -171,9 +173,9 @@ def model_fn(model_config, seed, train_ds):
     )
 
 
-def optim_fn(optim_config):
+def optim_fn(optim_config, batch_size, ds_size):
     optim_type = optim_config["type"]
-    return construct.optim(optim_type, optim_config)
+    return construct.optim(optim_type, optim_config, batch_size, ds_size)
 
 
 def dataset_fn(dataset_config, seed):
@@ -237,7 +239,7 @@ def record_metrics(
 # only caching on a fold-by-fold basis, and we can easily re-get these folds
 def experiment_loop(
     cv, seed, epochs, model, optim, train_ds, train_dl, test_ds,
-    valid_ds, weighted_loss=True, verbose=False,
+    valid_ds, record_every, weighted_loss=True, verbose=False,
 ):
     assert train_ds.n_classes == test_ds.n_classes
     assert train_ds.n_classes == valid_ds.n_classes
@@ -316,23 +318,30 @@ def experiment_loop(
                 loss,
             )
 
-        # Update sparsity
-        post_params = state.update_sparsity()
-        state = state.replace(params=post_params)
+            # Update sparsity
+            post_params = state.update_sparsity()
+            state = state.replace(params=post_params)
 
-        # Record performance at the end of each epoch
-        state = record_metrics(
-            "train", state, train_ds, train_datasets_for_labels, data,
-            loss,
-        )
-        state = record_metrics(
-            "test", state, test_ds, test_datasets_for_labels, data,
-            loss,
-        )
-        state = record_metrics(
-            "valid", state, valid_ds, valid_datasets_for_labels, data,
-            loss,
-        )
+        if (epoch + 1) % record_every == 0:
+            _start_eval_time = time.time()
+            print("RECORDING", record_every)
+            # Record performance at the end of epoch
+            state = record_metrics(
+                "train", state, train_ds, train_datasets_for_labels, data,
+                loss,
+            )
+            state = record_metrics(
+                "test", state, test_ds, test_datasets_for_labels, data,
+                loss,
+            )
+            state = record_metrics(
+                "valid", state, valid_ds, valid_datasets_for_labels, data,
+                loss,
+            )
+            print(
+                f"\tepoch {epoch} evaluation ended: " +
+                f"{time.time() - _start_eval_time}",
+            )
 
         print(f"epoch {epoch} ended: {time.time() - _start_time}")
 
