@@ -1,0 +1,4 @@
+Fix sparsity --> update every epoch
+
+Run dense for batch or for minibatch
+

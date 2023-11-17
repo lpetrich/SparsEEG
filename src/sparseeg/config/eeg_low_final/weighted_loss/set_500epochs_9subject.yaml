@@ -3,12 +3,12 @@ valid_percent: 0.1
 weighted_loss: true
 epochs: 500
 seed: [0, 1, 2]
-save_dir: "set_500epochs_3subject_weighted"
+save_dir: "set_500epochs_9subject_weighted"
 dataset:
   type: "WAYEEGGALDataset-Low"
   batch_size: [8192]
   shuffle: true
-  n_subjects: 3
+  n_subjects: 9
 model:
   type: "DenseMLP"
   hidden_layers: [[1024, 1024]]
@@ -35,4 +35,4 @@ model:
       type: "adam"
       args: [[]]
       kwargs:
-        learning_rate: [0.01, 0.001, 0.0001]
+        learning_rate: [0.001]
