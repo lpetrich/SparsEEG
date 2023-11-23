@@ -17,9 +17,7 @@ def satisfies(data, f):
 
     out = {}
     out_keys = sorted(out_keys)
-    print(out_keys)
     for i, k in enumerate(out_keys):
-        print(i, k)
         out[str(i)] = deepcopy(data[str(k)])
 
     return out

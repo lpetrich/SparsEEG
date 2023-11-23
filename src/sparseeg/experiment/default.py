@@ -1,3 +1,4 @@
+from copy import deepcopy
 import chex
 from functools import partial
 import numpy as np
@@ -123,7 +124,7 @@ def working_experiment():
     return main_experiment(default_config(), verbose=True)
 
 
-def main_experiment(config, save_file, verbose=False):
+def main_experiment(config, save_file, cache_datasets, verbose=False):
     seed = config["seed"]
     torch.manual_seed(seed)  # Needed to seed the shuffling procedure
     np.random.seed(seed)
@@ -156,7 +157,7 @@ def main_experiment(config, save_file, verbose=False):
     trainer = TTVSplitTrainer(
         experiment_loop, config, model_fn, optim_fn, dataset_fn, batch_size,
         shuffle, dataset.StratifiedTTV, train_percent, valid_percent,
-        record_every,
+        record_every, cache_datasets,
     )
 
     data = trainer.run(seed, epochs, weighted_loss, verbose)
@@ -243,6 +244,7 @@ def experiment_loop(
 ):
     assert train_ds.n_classes == test_ds.n_classes
     assert train_ds.n_classes == valid_ds.n_classes
+
     start_time = time.time()
 
     # Construct the training state
@@ -269,6 +271,16 @@ def experiment_loop(
         loss = optax.softmax_cross_entropy_with_integer_labels
 
     data = {}
+    data["dataset"] = {}
+    data["dataset"]["test"] = (
+        deepcopy(test_ds.x_samples),
+        deepcopy(test_ds.y_samples),
+    )
+    data["dataset"]["valid"] = (
+        deepcopy(test_ds.x_samples),
+        deepcopy(test_ds.y_samples),
+    )
+
     for type_ in ("train", "test", "valid"):
         for metric in state.metrics.keys():
             key = f"{type_}_{metric}"

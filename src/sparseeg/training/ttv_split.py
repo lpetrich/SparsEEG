@@ -22,7 +22,7 @@ class TTVSplitTrainer:
     def __init__(
         self, experiment_loop, config, model_fn,
         optim_fn, dataset_fn, batch_size, shuffle, splitter, train_percent,
-        valid_percent, record_every,
+        valid_percent, record_every, cache_datasets,
     ):
         self._record_every = record_every
         self.experiment_loop = experiment_loop
@@ -48,6 +48,7 @@ class TTVSplitTrainer:
         self._valid_percent = valid_percent
 
         self._save_data = {}
+        self._cache_datasets = cache_datasets
 
     def _split(self, ds, seed):
         splitter = self._splitter(
@@ -72,6 +73,29 @@ class TTVSplitTrainer:
         ds = self._dataset_fn(self._dataset_config, seed)
         splitted = self._split(ds, seed)
         train_ds, train_dl, test_ds, valid_ds = splitted
+
+        if self._cache_datasets:
+            print("Caching datasets...", end=" ")
+            with open(
+                f"cache/dataset/train_ds_seed{seed}_" +
+                f"percent{self._train_percent}.pkl",
+                "wb",
+            ) as outfile:
+                pickle.dump(train_ds, outfile)
+            with open(
+                f"cache/dataset/test_ds_seed{seed}_" +
+                f"percent{self._train_percent}.pkl",
+                "wb",
+            ) as outfile:
+                pickle.dump(test_ds, outfile)
+            with open(
+                f"cache/dataset/valid_ds_seed{seed}_" +
+                f"percent{self._train_percent}.pkl",
+                "wb",
+            ) as outfile:
+                pickle.dump(valid_ds, outfile)
+            print("Done!")
+            exit()
 
         model = self._model_fn(
             self._model_config, seed, train_ds,
