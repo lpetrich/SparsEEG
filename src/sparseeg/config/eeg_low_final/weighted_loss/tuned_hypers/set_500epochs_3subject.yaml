@@ -1,0 +1,60 @@
+dataset:
+  batch_size: 8192
+  n_subjects: 3
+  shuffle: true
+  type: WAYEEGGALDataset-Low
+epochs: 500
+model:
+  activations:
+  - - relu
+    - relu
+  hidden_layers:
+  - - 1024
+    - 1024
+  optim:
+    args: []
+    kwargs:
+      drop_fraction_fn: 'lambda _: 0.15'
+      scheduler:
+        args: []
+        kwargs:
+          update_end_step: null
+          update_freq: 1
+          update_start_step: 0
+        type: PeriodicSchedule
+      sparsity_distribution_fn:
+        kwargs:
+          sparsity: 0.25
+        type: erk
+    type: set
+    wrapped:
+      args: []
+      kwargs:
+        learning_rate: 0.001
+      type: adam
+  type: DenseMLP
+save_dir: set_500epochs_3subject_weighted_next_20_seeds
+seed:
+- 3
+- 4
+- 5
+- 6
+- 7
+- 8
+- 9
+- 10
+- 11
+- 12
+- 13
+- 14
+- 15
+- 16
+- 17
+- 18
+- 19
+- 20
+- 21
+- 22
+train_percent: 0.8
+valid_percent: 0.1
+weighted_loss: true
