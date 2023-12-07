@@ -130,6 +130,13 @@ class WAYEEGGALDataset(Dataset):
                 subjects = self._rng.choice(range(1, 11), n, replace=False)
             elif "subjects" in config.keys():
                 subjects = config["subjects"]
+            elif "subject" in config.keys():
+                subjects = [config["subject"]]
+            else:
+                raise ValuerError(
+                    "expected 'subjects', 'subject', or 'n_subjects' " +
+                    "keys in config"
+                )
 
             print(f"Using data from subjects {subjects}")
 
