@@ -103,6 +103,8 @@ class WAYEEGGALDataset(Dataset):
     def __init__(self, trim_level, config, seed):
         self._trim_level = trim_level
 
+        empty = config.get("empty", False)
+
         # Set the percent of each subject's data to train on
         if "percent" not in config:
             self._percent = 1.0
@@ -120,37 +122,39 @@ class WAYEEGGALDataset(Dataset):
         print("=====================")
         rng = np.random.default_rng(seed=seed)
         self._rng = rng
-        if "n_subjects" in config.keys():
-            n = config["n_subjects"]
-            assert n > 0
-            subjects = self._rng.choice(range(1, 11), n, replace=False)
-        elif "subjects" in config.keys():
-            subjects = config["subjects"]
 
-        print(f"Using data from subjects {subjects}")
+        if not empty:
+            if "n_subjects" in config.keys():
+                n = config["n_subjects"]
+                assert n > 0
+                subjects = self._rng.choice(range(1, 11), n, replace=False)
+            elif "subjects" in config.keys():
+                subjects = config["subjects"]
 
-        # Load first subject's data
-        self.x_samples, self.y_samples = self._load_subject_data(subjects[0])
+            print(f"Using data from subjects {subjects}")
 
-        # Load next subjects' data and randomly subsample as above
-        for subject in subjects[1:]:
-            X, y = self._load_subject_data(subject)
-            self.x_samples = np.concatenate((self.x_samples, X))
-            self.y_samples = np.concatenate((self.y_samples, y))
+            # Load first subject's data
+            self.x_samples, self.y_samples = self._load_subject_data(subjects[0])
 
-        # Renumber labels from 0
-        classes = np.unique(self.y_samples)
-        for i, c in enumerate(classes):
-            self.y_samples[self.y_samples == c] = i
+            # Load next subjects' data and randomly subsample as above
+            for subject in subjects[1:]:
+                X, y = self._load_subject_data(subject)
+                self.x_samples = np.concatenate((self.x_samples, X))
+                self.y_samples = np.concatenate((self.y_samples, y))
 
-        self._classes = np.unique(self.y_samples)
+            # Renumber labels from 0
+            classes = np.unique(self.y_samples)
+            for i, c in enumerate(classes):
+                self.y_samples[self.y_samples == c] = i
 
-        print(f"Number of x samples: {self.x_samples.shape}")
-        print(f"Number of y samples: {self.y_samples.shape}")
-        print(f"Number of classes: {self.n_classes}")
-        print(f"Targets: {self.classes}")
-        for c in self._classes:
-            print(f"\tClass {c} samples:", sum(self.y_samples == c))
+            self._classes = np.unique(self.y_samples)
+
+            print(f"Number of x samples: {self.x_samples.shape}")
+            print(f"Number of y samples: {self.y_samples.shape}")
+            print(f"Number of classes: {self.n_classes}")
+            print(f"Targets: {self.classes}")
+            for c in self._classes:
+                print(f"\tClass {c} samples:", sum(self.y_samples == c))
 
     def _load_subject_data(
         self, subject, trim_level=None, percent=None, rng=None,
@@ -227,6 +231,7 @@ class WAYEEGGALDataset(Dataset):
     def data(self, data):
         self.x_samples = data[0]
         self.y_samples = data[1]
+        self._classes = np.unique(self.y_samples)
 
     @property
     def n_classes(self):

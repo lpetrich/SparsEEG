@@ -2,8 +2,8 @@ train_percent: [0.1, 0.2, 0.3, 0.5, 0.7, 0.8]
 valid_percent: 0.1
 weighted_loss: true
 epochs: 500
-seed: [3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
-save_dir: "single_subject_set_500epochs_weighted_next_10_seeds"
+seed: [13, 14, 15, 16, 17]
+save_dir: "single_subject_set_500epochs_weighted_next_5_seeds_"
 dataset:
   type: "WAYEEGGALDataset-Low"
   batch_size: [8192]

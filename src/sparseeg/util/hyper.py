@@ -1,3 +1,4 @@
+from pprint import pprint
 from copy import deepcopy
 import os
 import fnmatch
@@ -95,6 +96,16 @@ def renumber(data, indices):
     return new_d
 
 
+def renumber_to(data, src_dest):
+    assert len(src_dest) == len(data)
+
+    new_d = {}
+    for k, v in src_dest:
+        new_d[v] = data[k]
+
+    return new_d
+
+
 def index_of(config, setting, ignore=["seed"]):
     # Ignore seeds when numbering hypers
     setting = deepcopy(setting)
@@ -104,6 +115,7 @@ def index_of(config, setting, ignore=["seed"]):
         del config[i]
 
     n = total(config)
+    inds = []
     for i in range(n):
         if sweeps(config, i)[0] == setting:
             return i
@@ -111,6 +123,9 @@ def index_of(config, setting, ignore=["seed"]):
 
 
 def total(config):
+    config = deepcopy(config)
+    if "seed" in config.keys():
+        del config["seed"]
     return sweeps(config, 0)[1]
 
 

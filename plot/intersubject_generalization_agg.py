@@ -59,7 +59,7 @@ for i in range(3):
         "batch_size": None,
         "shuffle": False,
         "subjects": subjects[i],
-        # "subjects": [2, 3],  # seed 1
+        "subjects": [11, 12],  # seed 1
         "percent": percent,
 
     }

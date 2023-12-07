@@ -1,3 +1,5 @@
+import bootstrapped.bootstrap as bs
+import bootstrapped.stats_functions as bs_stats
 import pandas as pd
 from pretty_confusion_matrix import pp_matrix_from_data
 import matplotlib.pyplot as plt
@@ -21,76 +23,125 @@ import matplotlib.pyplot as plt
 import click
 
 
+def inner_agg(x):
+    return np.mean(x)
+
+
+def outer_agg(x, axis):
+    return np.mean(x, axis=axis)
+
+
+alg = "weight_pruning"
+i = 9
+
 # We'll need to average over seeds eventually
-i = 2
-inds = [3, 4, 5]
-subjects = [
-    [1, 2, 3, 4, 5, 6, 10],
-    [1, 2, 3, 4, 7, 8, 9],
-    [1, 4, 5, 6, 7, 8, 10],
-]
-data_file = f"./results/dense_500epochs_3subject/{inds[i]}.pkl"
+data_file = f"./results/next_20_seeds/{alg}_500epochs_{i}subject_weighted_next_20_seeds/combined/"
 chptr = orbax.checkpoint.PyTreeCheckpointer()
 
 print("Loading...")
 data = chptr.restore(data_file)
 print("Loaded")
 
-key = list(data.keys())[0]
-seed = list(data[key]["data"].keys())[0]
-model_state = data[key]["data"][seed]["model"]
+print("Tuning")
+to_tune = "valid_accuracy"
+# perfs = hyper.perfs(data, to_tune, inner_agg, outer_agg, combined=False)
+# print(perfs)
+# key = str(hyper.best(perfs, np.mean))
+key = "None"
+pprint(data[key]["config"])
+print("Best:", key)
 
 ds_config = {
     "type": "WAYEEGGALDataset-Low",
     "batch_size": None,
     "shuffle": False,
-    "subjects": subjects[i],
-    # "subjects": [2, 3],  # seed 1
+    "subjects": [11, 12],  # seed 1
     "percent": 1.0,
 
 }
-
 ds = dataset.WAYEEGGALDataset("low", ds_config, 1)
-batch_size = 30000
-dl = loader.NumpyLoader(ds, batch_size, ds_config["shuffle"])
 
-labels = []
-predictions = []
+pr = []
+r = []
+acc = []
 
-model = default.model_fn(data[key]["config"]["model"], 1, ds)
+for seed in data[key]["data"].keys():
+    model_state = data[key]["data"][seed]["model"]
 
-# Compute label metrics
-for x_batch, y_batch in dl:
-    batch = {"inputs": x_batch, "labels": y_batch}
-    logits = model.apply(
-        {'params': model_state["params"]}, batch['inputs'],
+    batch_size = len(ds)
+    dl = loader.NumpyLoader(ds, batch_size, ds_config["shuffle"])
+
+    model = default.model_fn(data[key]["config"]["model"], 1, ds)
+
+    # Compute label metrics
+    labels = []
+    predictions = []
+    for x_batch, y_batch in dl:
+        batch = {"inputs": x_batch, "labels": y_batch}
+        logits = model.apply(
+            {'params': model_state["params"]}, batch['inputs'],
+        )
+        pred = jnp.argmax(logits, axis=-1)
+
+        labels.extend(y_batch)
+        predictions.extend(pred)
+
+    _pr, _r = skmetrics.precision_recall_fscore_support(
+        labels, predictions
+    )[0:2]
+    pr.append(_pr)
+    r.append(_r)
+
+    # TODO: Ci
+    correct = np.array(labels) == np.array(predictions)
+    _acc = sum(correct) / len(labels)
+    acc.append(_acc)
+
+pr = np.array(pr)
+r = np.array(r)
+
+# print(pr.shape)
+
+acc = np.array(acc)
+significance = 0.05
+conf = bs.bootstrap(acc, stat_func=bs_stats.mean, alpha=significance)
+print(f"{acc.mean():.3f} ({conf.lower_bound:.3f}, {conf.upper_bound:.3f})")
+
+pr_ci = [[], []]
+for j in range(pr.shape[1]):
+    conf = bs.bootstrap(
+        pr[:, j], stat_func=bs_stats.mean,
+        alpha=significance,
     )
-    pred = jnp.argmax(logits, axis=-1)
+    pr_ci[0].append(conf.lower_bound)
+    pr_ci[1].append(conf.upper_bound)
+ci = pr_ci
+print(
+    f"({ci[0][0]:.3f}, {ci[1][0]:.3f}) & ({ci[0][1]:.3f}, {ci[1][1]:.3f}) & " +
+    f"({ci[0][2]:.3f}, {ci[1][2]:.3f}) & ({ci[0][3]:.3f}, {ci[1][3]:.3f})"
+)
 
-    labels.extend(y_batch)
-    predictions.extend(pred)
+r_ci = [[], []]
+for j in range(pr.shape[1]):
+    conf = bs.bootstrap(
+        r[:, j], stat_func=bs_stats.mean,
+        alpha=significance,
+    )
+    r_ci[0].append(conf.lower_bound)
+    r_ci[1].append(conf.upper_bound)
+ci = r_ci
+print(
+    f"({ci[0][0]:.3f}, {ci[1][0]:.3f}) & ({ci[0][1]:.3f}, {ci[1][1]:.3f}) & " +
+    f"({ci[0][2]:.3f}, {ci[1][2]:.3f}) & ({ci[0][3]:.3f}, {ci[1][3]:.3f})"
+)
 
-labels = np.array(labels).ravel()
-predictions = np.array(predictions).ravel()
+# labels = np.array(labels).ravel()
+# predictions = np.array(predictions).ravel()
 
-print(type(labels), labels.shape)
-print(type(predictions), predictions.shape)
+# print(type(labels), labels.shape)
+# print(type(predictions), predictions.shape)
 
-pp_matrix_from_data(labels, predictions, cmap="BuPu")
-print(skmetrics.precision_recall_fscore_support(
-    labels, predictions
-))
-
-
-#     fig = plt.figure()
-#     axes = fig.subplots(2, 2)
-#     conf = skmetrics.multilabel_confusion_matrix(y_batch, predicted)
-#     for i in range(len(axes.ravel())):
-#         disp = skmetrics.ConfusionMatrixDisplay(
-#             conf[i, :, :],
-#         )
-#         disp.plot()
-
-#         axes.ravel()[i] = disp.ax_
-
-#         fig.savefig("/home/samuel/conf.png")
+# pp_matrix_from_data(labels, predictions, cmap="BuPu")
+# print(skmetrics.precision_recall_fscore_support(
+#     labels, predictions
+# ))

@@ -6,6 +6,8 @@ import sparseeg.util.hyper as hyper
 import numpy as np
 import matplotlib.pyplot as plt
 import click
+import bootstrapped.bootstrap as bs
+import bootstrapped.stats_functions as bs_stats
 
 
 def inner_agg(x):
@@ -24,7 +26,8 @@ def smooth(x, over):
     else:
         kernel = over
 
-    return np.apply_along_axis(np.convolve, 0, x, kernel, mode="valid")
+    smoothed = np.apply_along_axis(np.convolve, 0, x, kernel, mode="valid")
+    return np.concatenate((x[0:1, :, :], smoothed), axis=0)
 
 
 def get_title(data_file):
@@ -40,7 +43,7 @@ def get_title(data_file):
     return title
 
 
-def get_save_file(data_file):
+def get_save_file(data_file, combined):
     if "dense" in data_file:
         save_name = "dense"
     elif "set" in data_file:
@@ -50,7 +53,9 @@ def get_save_file(data_file):
     else:
         save_name = "unknown"
 
-    return save_name
+    n = "".join(filter(str.isdigit, data_file))[-1]
+
+    return save_name + f"_{n}" + ("_combined" if combined else "")
 
 
 @click.argument("data_file", type=click.Path(exists=True))
@@ -63,7 +68,7 @@ def plot(data_file, smooth_over, combined, skip):
 
     print("Loading...")
     data = chptr.restore(data_file)
-    # data = hyper.satisfies(data, lambda x: x["dataset"]["batch_size"] == 0)
+    data = hyper.satisfies(data, lambda x: x["dataset"]["batch_size"] == 8192)
     print("Loaded")
 
     print("Tuning")
@@ -75,11 +80,14 @@ def plot(data_file, smooth_over, combined, skip):
     print("Best:", b)
 
     # Get data to plot and smooth it
-    to_plot = "test_accuracy"
-    plot_data = hyper.get(data, b, to_plot, combined=combined)
+    test_accuracy = hyper.get(data, b, "test_accuracy", combined=combined)
+    # train_accuracy = hyper.get(data, b, "train_accuracy", combined=combined)
+    plot_data = test_accuracy
     if skip > 0:
         plot_data = plot_data[::skip, :, :]
     plot_data = smooth(plot_data, smooth_over)
+
+    plot_data = plot_data[::5, :, :]
 
     n_classes = plot_data.shape[1]
 
@@ -91,40 +99,84 @@ def plot(data_file, smooth_over, combined, skip):
     x_values = np.arange(0, n_readings)
     x_values = np.expand_dims(x_values, axis=1).repeat(n_classes, 1)
 
-    fig = plt.figure()
+    fig = plt.figure(figsize=(7, 6))
     ax = fig.add_subplot()
+    significance = 0.05
 
+    colours = ["black", "red", "blue", "green"]
     if not combined:
         labels = np.array([f"Class {i}" for i in range(n_classes)])
-        ax.plot(x_values, mean_plot_data, label=labels)
         for i in range(n_classes):
-            ax.fill_between(
-                x_values[:, i],
-                mean_plot_data[:, i] - stderr_plot_data[:, i],
-                mean_plot_data[:, i] + stderr_plot_data[:, i],
-                alpha=0.25,
+
+            ci = [[], []]
+            for j in range(plot_data.shape[0]):
+                conf = bs.bootstrap(
+                    plot_data[j, i, :], stat_func=bs_stats.mean,
+                    alpha=significance,
+                )
+                ci[0].append(conf.lower_bound)
+                ci[1].append(conf.upper_bound)
+            ci = np.array(ci)
+            ax.plot(
+                x_values[:, i], mean_plot_data[:, i], label=labels[i],
+                color=colours[i],
             )
+            ax.fill_between(
+                x_values[:, i], ci[0], ci[1], alpha=0.2,
+                color=colours[i],
+            )
+
     else:
-        labels = np.array(["Accuracy"])
-        ax.plot(x_values[:, 1], mean_plot_data, label=labels)
-        ax.fill_between(
-            x_values[:, 1],
-            mean_plot_data - stderr_plot_data,
-            mean_plot_data + stderr_plot_data,
-            alpha=0.25,
+        ci = [[], []]
+        for j in range(plot_data.shape[0]):
+            conf = bs.bootstrap(
+                plot_data[j, :], stat_func=bs_stats.mean,
+                alpha=significance,
+            )
+            ci[0].append(conf.lower_bound)
+            ci[1].append(conf.upper_bound)
+        ci = np.array(ci)
+
+        ax.plot(
+            x_values[:, 1], mean_plot_data, label="Accuracy",
+            color="black",
         )
-    ax.legend()
+        # ax.fill_between(
+        #     x_values[:, 1],
+        #     mean_plot_data - stderr_plot_data,
+        #     mean_plot_data + stderr_plot_data, alpha=0.25,
+        # )
+        ax.fill_between(
+            x_values[:, 1], ci[0], ci[1], alpha=0.2, color="black",
+        )
+    ax.legend(loc="lower right", fontsize=12)
 
-    ax.set_ylim((-0.05, 1.05))
+    ax.set_ylim((-0.05, 1.2))
     # ax.set_xlim((0, n_readings))
-    ax.set_ylabel("Accuracy")
-    ax.set_xlabel("Epochs")
-    title = "Dense" if "dense" in data_file else "Set"
-    ax.set_title(get_title(data_file))
+    ax.set_ylabel("Accuracy", fontsize=22)
+    ax.set_xlabel("Epochs", fontsize=22)
 
-    save_name = get_save_file(data_file)
+    ax.set_xticks(
+        range(0, 101, 20),
+        labels=range(0, 501, 100),
+        fontsize=16,
+    )
+    ax.set_yticks(
+        [0.0, 0.2, 0.4, 0.6, 0.8, 1.0],
+        labels=[0.0, 0.2, 0.4, 0.6, 0.8, 1.0],
+        fontsize=16,
+    )
 
-    fig.savefig(f"{os.path.expanduser('~')}/{save_name}.png")
+    save_name = get_save_file(data_file, combined)
+
+    fig.savefig(
+        f"{os.path.expanduser('~')}/SparsEEGPlots/{save_name}_minibatch.png",
+        bbox_inches="tight",
+    )
+    fig.savefig(
+        f"{os.path.expanduser('~')}/SparsEEGPlots/{save_name}_minibatch.svg",
+        bbox_inches="tight",
+    )
 
 
 if __name__ == "__main__":

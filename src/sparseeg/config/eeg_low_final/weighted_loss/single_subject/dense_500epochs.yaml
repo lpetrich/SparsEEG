@@ -1,12 +1,12 @@
-train_percent: [0.1, 0.2, 0.3, 0.5, 0.7, 0.8]
+train_percent: [0.1]
 valid_percent: 0.1
 weighted_loss: true
 epochs: 500
-seed: [0, 1, 2]
-save_dir: "single_subject_dense_500epochs_weighted"
+seed: [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17]
+save_dir: "single_subject_dense_500epochs_weighted_next_10_seeds"
 dataset:
   type: "WAYEEGGALDataset-Low"
-  batch_size: [0, 8192]
+  batch_size: [0]
   shuffle: true
   n_subjects: 1
 model:
@@ -17,4 +17,4 @@ model:
     type: "adam"
     args: [[]]
     kwargs:
-        learning_rate: [0.01, 0.001, 0.0001]
+        learning_rate: [0.01]

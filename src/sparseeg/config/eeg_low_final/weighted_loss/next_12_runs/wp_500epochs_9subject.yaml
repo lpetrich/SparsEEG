@@ -1,14 +1,14 @@
-train_percent: [0.1, 0.2, 0.3, 0.5, 0.7, 0.8]
+train_percent: 0.8
 valid_percent: 0.1
 weighted_loss: true
 epochs: 500
-seed: [3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
-save_dir: "single_subject_weight_pruning_500epochs_weighted_next_10_seeds"
+seed: [0, 1, 2]
+save_dir: "weight_pruning_500epochs_9subject_weighted"
 dataset:
   type: "WAYEEGGALDataset-Low"
   batch_size: [8192]
   shuffle: true
-  n_subjects: 1
+  n_subjects: 9
 model:
   type: "DenseMLP"
   hidden_layers: [[1024, 1024]]
@@ -19,7 +19,7 @@ model:
     kwargs:
       scheduler:
         type: "OneShotSchedule"
-        args: [[167], [333]] # epochs
+        args: [[167], [333], [400]]
         kwargs: {}
       sparsity_distribution_fn:
         type: "erk"

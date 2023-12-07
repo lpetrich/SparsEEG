@@ -17,7 +17,7 @@ model:
       learning_rate: 0.001
     type: adam
   type: DenseMLP
-save_dir: dense_500epochs_9subject_weighted_next_20_seeds
+save_dir: next_20_seeds/dense_500epochs_9subject_weighted_next_20_seeds
 seed:
 - 3
 - 4

@@ -1,14 +1,14 @@
 train_percent: 0.8
 valid_percent: 0.1
 weighted_loss: true
-epochs: 2
+epochs: 500
 seed: [0, 1, 2]
-save_dir: "TEST"
+save_dir: "dense_500epochs_3subject_weighted"
 dataset:
   type: "WAYEEGGALDataset-Low"
   batch_size: [0, 8192]
   shuffle: true
-  n_subjects: 1
+  n_subjects: 3
 model:
   type: "DenseMLP"
   hidden_layers: [[1024, 1024]]

@@ -82,7 +82,7 @@ class Metrics(training_state.MetricsCollection):
 
 
 # @jit
-@partial(jit, static_argnames=("loss_fn"))
+# @partial(jit, static_argnames=("loss_fn"))
 def compute_metrics(*, state, batch, loss_fn):
     logits = state.apply_fn({'params': state.params}, batch['inputs'])
     loss = loss_fn(
@@ -245,6 +245,9 @@ def experiment_loop(
     assert train_ds.n_classes == test_ds.n_classes
     assert train_ds.n_classes == valid_ds.n_classes
 
+    print(len(test_ds))
+    print(len(train_ds))
+
     start_time = time.time()
 
     # Construct the training state
@@ -277,8 +280,8 @@ def experiment_loop(
         deepcopy(test_ds.y_samples),
     )
     data["dataset"]["valid"] = (
-        deepcopy(test_ds.x_samples),
-        deepcopy(test_ds.y_samples),
+        deepcopy(valid_ds.x_samples),
+        deepcopy(valid_ds.y_samples),
     )
 
     for type_ in ("train", "test", "valid"):
