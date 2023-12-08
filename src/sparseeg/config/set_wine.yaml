@@ -1,7 +1,7 @@
 n_internal_folds: 5
 n_external_folds: 5
-epochs: 200
-seed: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+epochs: 250
+seed: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29]
 save_dir: "set_wine"
 dataset:
   type: "WineDataset"
@@ -11,7 +11,7 @@ dataset:
   shuffle_external: true
 model:
   type: "DenseMLP"
-  hidden_layers: [[16, 16], [32, 32], [64, 64], [96, 96]]
+  hidden_layers: [[16, 16], [32, 32], [64, 64], [128, 128], [256, 256]]
   activations: [["relu", "relu"]]
   optim:
     type: "set"
@@ -22,7 +22,7 @@ model:
         type: "PeriodicSchedule"
         args: []
         kwargs:
-          update_freq: 10
+          update_freq: [10, 25, 50]
           update_start_step: 0
           update_end_step: null
       sparsity_distribution_fn:
@@ -32,4 +32,4 @@ model:
       type: "adam"
       args: [[]]
       kwargs:
-        learning_rate: [0.1, 0.01, 0.001, 0.0001]
+        learning_rate: [0.01, 0.001, 0.0001]

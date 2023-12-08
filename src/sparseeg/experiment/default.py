@@ -1,3 +1,5 @@
+from copy import deepcopy
+import chex
 from functools import partial
 import numpy as np
 import jaxpruner
@@ -28,8 +30,43 @@ from math import gcd
 import warnings
 
 
-def get_data(identifier, seed):
-    return dataset.load(identifier, seed)
+@struct.dataclass
+class WeightedSoftmaxCrossEntropyWithIntegerLabels:
+    label_weights: jnp.ndarray
+
+    @classmethod
+    def weights(cls, train_ds):
+        n_classes = train_ds.n_classes
+        y_samples = train_ds.y_samples
+        n_samples = len(y_samples)
+
+        # https://scikit-learn.org/stable/modules/generated/sklearn.svm.SVC.html
+        return n_samples / (n_classes * jnp.bincount(y_samples))
+
+    def compute(
+        self,
+        logits: chex.Array,
+        labels: chex.Array,
+    ) -> chex.Array:
+        chex.assert_type([logits], float)
+        chex.assert_type([labels], int)
+
+        weights = self.label_weights[labels]
+
+        # This is like jnp.take_along_axis(jax.nn.log_softmax(...), ...) except
+        # that we avoid subtracting the normalizer from all values, just from
+        # the values for the correct labels.
+        logits_max = jnp.max(logits, axis=-1, keepdims=True)
+        logits -= jax.lax.stop_gradient(logits_max)
+        label_logits = jnp.take_along_axis(
+            logits, labels[..., None], axis=-1,
+        )[..., 0]
+        log_normalizers = jnp.log(jnp.sum(jnp.exp(logits), axis=-1))
+        return weights * (log_normalizers - label_logits)
+
+
+def get_data(identifier, config, seed):
+    return dataset.load(identifier, config, seed)
 
 
 ####################################################################
@@ -44,10 +81,11 @@ class Metrics(training_state.MetricsCollection):
     loss_std: metrics.Std.from_output("loss")
 
 
-@jit
-def compute_metrics(*, state, batch):
+# @jit
+# @partial(jit, static_argnames=("loss_fn"))
+def compute_metrics(*, state, batch, loss_fn):
     logits = state.apply_fn({'params': state.params}, batch['inputs'])
-    loss = optax.softmax_cross_entropy_with_integer_labels(
+    loss = loss_fn(
         logits=logits, labels=batch['labels']
     ).mean()
     labels = jnp.array(batch["labels"], dtype=jnp.int32)
@@ -86,11 +124,14 @@ def working_experiment():
     return main_experiment(default_config(), verbose=True)
 
 
-def main_experiment(config, save_file, verbose=False):
+def main_experiment(config, save_file, cache_datasets, verbose=False):
     seed = config["seed"]
     torch.manual_seed(seed)  # Needed to seed the shuffling procedure
+    np.random.seed(seed)
 
     epochs = config["epochs"]
+
+    weighted_loss = config["weighted_loss"]
 
     train_percent = config["train_percent"]
     valid_percent = config["valid_percent"]
@@ -111,12 +152,15 @@ def main_experiment(config, save_file, verbose=False):
 
     dataset_name = dataset_config["type"]
 
+    record_every = config.get("record_every", 5)
+
     trainer = TTVSplitTrainer(
         experiment_loop, config, model_fn, optim_fn, dataset_fn, batch_size,
         shuffle, dataset.StratifiedTTV, train_percent, valid_percent,
+        record_every, cache_datasets,
     )
 
-    data = trainer.run(seed, epochs, verbose)
+    data = trainer.run(seed, epochs, weighted_loss, verbose)
     return {"data": data, "config": config}
 
 
@@ -130,32 +174,60 @@ def model_fn(model_config, seed, train_ds):
     )
 
 
-def optim_fn(optim_config):
+def optim_fn(optim_config, batch_size, ds_size):
     optim_type = optim_config["type"]
-    return construct.optim(optim_type, optim_config)
+    return construct.optim(optim_type, optim_config, batch_size, ds_size)
 
 
 def dataset_fn(dataset_config, seed):
     dataset_name = dataset_config["type"]
-    return get_data(dataset_name, seed)
+    return get_data(dataset_name, dataset_config, seed)
 
 
-def record_metrics(type_, state, datasets_for_labels, data):
+def record_metrics(
+    type_, state, full_dataset, datasets_for_labels, data, loss_fn,
+):
+    ####################################################################
+    # Compute metrics for each separate label
+    ####################################################################
     for label in range(len(datasets_for_labels)):
         ds = datasets_for_labels[label]
         if len(ds) == 0:
             continue
+
         dl = loader.NumpyLoader(ds, batch_size=len(ds), shuffle=False)
 
         # Compute label metrics
         for x_batch, y_batch in dl:
             batch = {"inputs": x_batch, "labels": y_batch}
-            state = compute_metrics(state=state, batch=batch)
+            state = compute_metrics(
+                state=state, batch=batch, loss_fn=loss_fn,
+            )
             for metric, value in state.metrics.compute().items():
                 key = f"{type_}_{metric}"
-                data[key][label].append(value.item())
+                data[key]["label-by-label"][label].append(value.item())
 
             state = state.replace(metrics=state.metrics.empty())
+    ####################################################################
+
+    ####################################################################
+    # Compute metrics for all labels/combined dataset
+    ####################################################################
+    dl = loader.NumpyLoader(
+        full_dataset, batch_size=len(full_dataset), shuffle=False,
+    )
+
+    # Compute label metrics
+    for x_batch, y_batch in dl:
+        batch = {"inputs": x_batch, "labels": y_batch}
+        state = compute_metrics(
+            state=state, batch=batch, loss_fn=loss_fn,
+        )
+        for metric, value in state.metrics.compute().items():
+            key = f"{type_}_{metric}"
+            data[key]["combined"].append(value.item())
+
+        state = state.replace(metrics=state.metrics.empty())
 
     return state.replace(metrics=state.metrics.empty())
 
@@ -168,10 +240,14 @@ def record_metrics(type_, state, datasets_for_labels, data):
 # only caching on a fold-by-fold basis, and we can easily re-get these folds
 def experiment_loop(
     cv, seed, epochs, model, optim, train_ds, train_dl, test_ds,
-    valid_ds, verbose=False,
+    valid_ds, record_every, weighted_loss=True, verbose=False,
 ):
     assert train_ds.n_classes == test_ds.n_classes
     assert train_ds.n_classes == valid_ds.n_classes
+
+    print(len(test_ds))
+    print(len(train_ds))
+
     start_time = time.time()
 
     # Construct the training state
@@ -181,11 +257,41 @@ def experiment_loop(
     )
     del init_rng
 
+    # TODO: use this loss function when computing metrics and when stepping the
+    # model! Everywhere we use optax.softmax_cross_entropy_with_integer_labels,
+    # we should replace with a call to a function argument where the loss is
+    # passed in. That way, we can pass in
+    # optax.softmax_cross_entropy_with_integer_labels or this weighted loss
+    # class/function instead!
+    if weighted_loss:
+        weights = WeightedSoftmaxCrossEntropyWithIntegerLabels.weights(
+            train_ds,
+        )
+        loss = WeightedSoftmaxCrossEntropyWithIntegerLabels(
+            weights,
+        ).compute
+    else:
+        loss = optax.softmax_cross_entropy_with_integer_labels
+
     data = {}
+    data["dataset"] = {}
+    data["dataset"]["test"] = (
+        deepcopy(test_ds.x_samples),
+        deepcopy(test_ds.y_samples),
+    )
+    data["dataset"]["valid"] = (
+        deepcopy(valid_ds.x_samples),
+        deepcopy(valid_ds.y_samples),
+    )
+
     for type_ in ("train", "test", "valid"):
         for metric in state.metrics.keys():
             key = f"{type_}_{metric}"
-            data[key] = [[] for _ in range(train_ds.n_classes)]
+            data[key] = {}
+            data[key]["label-by-label"] = [
+                [] for _ in range(train_ds.n_classes)
+            ]
+            data[key]["combined"] = []
 
     train_datasets_for_labels = tuple(
         train_ds.get_dataset_for(label)
@@ -201,25 +307,58 @@ def experiment_loop(
     )
 
     # Record performance before training
-    state = record_metrics("train", state, train_datasets_for_labels, data)
-    state = record_metrics("test", state, test_datasets_for_labels, data)
-    state = record_metrics("valid", state, valid_datasets_for_labels, data)
+    state = record_metrics(
+        "train", state, train_ds, train_datasets_for_labels, data,
+        loss,
+    )
+    state = record_metrics(
+        "test", state, test_ds, test_datasets_for_labels, data,
+        loss,
+    )
+    state = record_metrics(
+        "valid", state, valid_ds, valid_datasets_for_labels, data,
+        loss,
+    )
 
     for epoch in range(epochs):
-        print(f"epoch {epoch} completed")
+        _start_time = time.time()
+        print(f"epoch {epoch} started: {_start_time}")
         # Train for one epoch
         for x_batch, y_batch in train_dl:
             train_batch = {"inputs": x_batch, "labels": y_batch}
 
-            state = training_state.step(state, train_batch)
+            state = training_state.step(
+                state,
+                train_batch,
+                loss,
+            )
 
+            # Update sparsity
             post_params = state.update_sparsity()
             state = state.replace(params=post_params)
 
-        # Record performance at the end of each epoch
-        state = record_metrics("train", state, train_datasets_for_labels, data)
-        state = record_metrics("test", state, test_datasets_for_labels, data)
-        state = record_metrics("valid", state, valid_datasets_for_labels, data)
+        if (epoch + 1) % record_every == 0:
+            _start_eval_time = time.time()
+            print("RECORDING", record_every)
+            # Record performance at the end of epoch
+            state = record_metrics(
+                "train", state, train_ds, train_datasets_for_labels, data,
+                loss,
+            )
+            state = record_metrics(
+                "test", state, test_ds, test_datasets_for_labels, data,
+                loss,
+            )
+            state = record_metrics(
+                "valid", state, valid_ds, valid_datasets_for_labels, data,
+                loss,
+            )
+            print(
+                f"\tepoch {epoch} evaluation ended: " +
+                f"{time.time() - _start_eval_time}",
+            )
+
+        print(f"epoch {epoch} ended: {time.time() - _start_time}")
 
     data["total_time"] = time.time() - start_time
     data["model"] = state

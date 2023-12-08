@@ -2,7 +2,7 @@ import jax
 import numpy as np
 import jax.numpy as jnp
 from torch.utils.data import Dataset
-import sklearn.model_selection as model_selection
+import sklearn.model_selection as ms
 from sklearn.datasets import load_wine
 from sparseeg.data.csv_loader import load_wayeeggal
 from copy import deepcopy
@@ -24,10 +24,10 @@ class StratifiedTTV(DatasetSplitter):
         self.train_percent = train_percent
         self.validation_percent = validation_percent
         self.test_percent = 1 - self.train_percent - self.validation_percent
-        assert (
+        assert np.isclose(
             self.train_percent +
             self.test_percent +
-            self.validation_percent == 1
+            self.validation_percent, 1
         )
         self.shuffle = shuffle
 
@@ -36,20 +36,28 @@ class StratifiedTTV(DatasetSplitter):
         test_ds = deepcopy(ds)
         validation_ds = deepcopy(ds)
 
-        x_train, x_test, y_train, y_test = model_selection.train_test_split(
-            train_ds.x_samples, train_ds.y_samples,
-            stratify=train_ds.y_samples, random_state=self.seed,
-            shuffle=self.shuffle, test_size=self.test_percent,
-        )
+        if self.test_percent > 0:
+            x_train, x_test, y_train, y_test = ms.train_test_split(
+                train_ds.x_samples, train_ds.y_samples,
+                stratify=train_ds.y_samples, random_state=self.seed,
+                shuffle=self.shuffle, test_size=self.test_percent,
+            )
+            test_ds.data = (x_test, y_test)
+        else:
+            x_train, y_train = train_ds.x_samples, train_ds.y_samples
 
-        x_train, x_valid, y_train, y_valid = model_selection.train_test_split(
+        x_train, x_valid, y_train, y_valid = ms.train_test_split(
             x_train, y_train, stratify=y_train, random_state=self.seed,
             shuffle=self.shuffle, test_size=self.validation_percent,
         )
 
         train_ds.data = (x_train, y_train)
-        test_ds.data = (x_test, y_test)
         validation_ds.data = (x_valid, y_valid)
+
+        print("Dataset Statistics:")
+        print(f"\tTraining on {len(train_ds)} samples")
+        print(f"\tTesting on {len(test_ds)} samples")
+        print(f"\tValidating on {len(validation_ds)} samples")
 
         return train_ds, test_ds, validation_ds
 
@@ -60,7 +68,7 @@ class StratifiedKFold(DatasetSplitter):
         self.ds = ds
 
     def split(self, fold):
-        skf = model_selection.StratifiedKFold(n_splits=self.n_folds)
+        skf = ms.StratifiedKFold(n_splits=self.n_folds)
         return self._split(skf, fold)
 
     def _split(self, kf, fold):
@@ -92,54 +100,113 @@ class StratifiedKFold(DatasetSplitter):
 
 
 class WAYEEGGALDataset(Dataset):
-    def __init__(self, trim_level):
+    def __init__(self, trim_level, config, seed):
+        self._trim_level = trim_level
+
+        empty = config.get("empty", False)
+
+        # Set the percent of each subject's data to train on
+        if "percent" not in config:
+            self._percent = 1.0
+        else:
+            percent = config["percent"]
+            if isinstance(percent, int):
+                percent /= 100
+            self._percent = percent
+
         print(f"Initializing WAL-EEG-GAL Dataset of type: {Dataset}")
-        # this will return all series for one subject
-        # TODO: add subject to config file?
-        subject = 1
-        data = load_wayeeggal(subject=subject, train=True)
 
-        self.x_samples = data["data"]
-        self.y_samples = data["target"]
+        # Get the number of subjects whose data to include
+        print("=====================")
+        print(f"Using seed: {seed}")
+        print("=====================")
+        rng = np.random.default_rng(seed=seed)
+        self._rng = rng
 
-        if trim_level == "kaggle":
+        if not empty:
+            if "n_subjects" in config.keys():
+                n = config["n_subjects"]
+                assert n > 0
+                subjects = self._rng.choice(range(1, 11), n, replace=False)
+            elif "subjects" in config.keys():
+                subjects = config["subjects"]
+            elif "subject" in config.keys():
+                subjects = [config["subject"]]
+            else:
+                raise ValuerError(
+                    "expected 'subjects', 'subject', or 'n_subjects' " +
+                    "keys in config"
+                )
+
+            print(f"Using data from subjects {subjects}")
+
+            # Load first subject's data
+            self.x_samples, self.y_samples = self._load_subject_data(subjects[0])
+
+            # Load next subjects' data and randomly subsample as above
+            for subject in subjects[1:]:
+                X, y = self._load_subject_data(subject)
+                self.x_samples = np.concatenate((self.x_samples, X))
+                self.y_samples = np.concatenate((self.y_samples, y))
+
+            # Renumber labels from 0
+            classes = np.unique(self.y_samples)
+            for i, c in enumerate(classes):
+                self.y_samples[self.y_samples == c] = i
+
+            self._classes = np.unique(self.y_samples)
+
+            print(f"Number of x samples: {self.x_samples.shape}")
+            print(f"Number of y samples: {self.y_samples.shape}")
+            print(f"Number of classes: {self.n_classes}")
+            print(f"Targets: {self.classes}")
+            for c in self._classes:
+                print(f"\tClass {c} samples:", sum(self.y_samples == c))
+
+    def _load_subject_data(
+        self, subject, trim_level=None, percent=None, rng=None,
+    ):
+        if rng is None:
+            rng = self._rng
+        if trim_level is None:
+            trim_level = self._trim_level
+        if percent is None:
+            percent = self._percent
+
+        # Load data
+        X, y = load_wayeeggal(
+            subject=subject, train=True, return_X_y=True,
+        )
+
+        # Restrict to only specific labels
+        X, y = self._restrict(X, y, trim_level)
+
+        # Randomly subsample the data
+        return _random_subset(rng, X, y, percent)
+
+    def _restrict(self, X, y, level):
+        if level.lower() == "full":
+            return X, y
+        if level.lower() == "kaggle":
             inds = np.where(
-                (self.y_samples == 2) |
-                (self.y_samples == 3) |
-                (self.y_samples == 5) |
-                (self.y_samples == 7) |
-                (self.y_samples == 8) |
-                (self.y_samples == 10),
+                (y == 2) |
+                (y == 3) |
+                (y == 5) |
+                (y == 7) |
+                (y == 8) |
+                (y == 10),
                 True, False,
             )
-        elif trim_level == "low":
+        elif level.lower() == "low":
             inds = np.where(
-                (self.y_samples == 2) |
-                (self.y_samples == 7) |
-                (self.y_samples == 8) |
-                (self.y_samples == 10),
+                (y == 2) |
+                (y == 7) |
+                (y == 8) |
+                (y == 10),
                 True, False,
             )
 
-        self.y_samples = self.y_samples[inds]
-        self.x_samples = self.x_samples[inds]
-
-        self.y_samples -= 1  # Renumber targets to start from 0
-
-        # Renumber labels from 0
-        classes = np.unique(self.y_samples)
-        for i, c in enumerate(classes):
-            self.y_samples[self.y_samples == c] = i
-
-        self._classes = np.unique(self.y_samples)
-
-        print(f"Number of x samples: {self.x_samples.shape}")
-        print(f"Number of y samples: {self.y_samples.shape}")
-        print(f"Number of classes: {self.n_classes}")
-        print(f"Target names: {data['target_names']}")
-        print(f"Feature names: {data['feature_names']}")
-        for c in self._classes:
-            print(f"\tClass {c} samples:", sum(self.y_samples == c))
+        return X[inds], y[inds]
 
     def __len__(self):
         return len(self.y_samples)
@@ -171,6 +238,7 @@ class WAYEEGGALDataset(Dataset):
     def data(self, data):
         self.x_samples = data[0]
         self.y_samples = data[1]
+        self._classes = np.unique(self.y_samples)
 
     @property
     def n_classes(self):
@@ -186,7 +254,7 @@ class WineDataset(Dataset):
         data = load_wine()
         self.x_samples = data["data"]
         self.y_samples = data["target"]
-        self._n_classes = 3
+        self._classes = np.unique(self.y_samples)
 
     def __len__(self):
         return len(self.y_samples)
@@ -207,6 +275,14 @@ class WineDataset(Dataset):
         return new
 
     @property
+    def n_classes(self):
+        return len(self.classes)
+
+    @property
+    def classes(self):
+        return self._classes
+
+    @property
     def n_samples(self):
         return len(self)
 
@@ -219,14 +295,10 @@ class WineDataset(Dataset):
         self.x_samples = data[0]
         self.y_samples = data[1]
 
-    @property
-    def n_classes(self):
-        return self._n_classes
-
 
 class ClassifierDataset(Dataset):
     def __init__(self, rng, n_samples, x_dim, n_classes):
-        self._n_classes = n_classes
+        self.n_classes = n_classes
 
         key, key_sample, key_noise = jax.random.split(rng, 3)
         x_samples = jax.random.normal(key_sample, (n_samples, x_dim))
@@ -307,7 +379,7 @@ def load_train_test(identifier: str, seed):
 
 
 # Load a full dataset
-def load(identifier: str, seed):
+def load(identifier: str, config, seed):
     train_init_rng = jax.random.key(seed)
     identifier = identifier.lower()
 
@@ -318,12 +390,22 @@ def load(identifier: str, seed):
     elif identifier == "winedataset":
         train_ds = WineDataset()
     elif identifier == "wayeeggaldataset":
-        train_ds = WAYEEGGALDataset("kaggle")
+        train_ds = WAYEEGGALDataset("kaggle", config, seed)
     elif identifier == "wayeeggaldataset-low":
-        train_ds = WAYEEGGALDataset("low")
+        train_ds = WAYEEGGALDataset("low", config, seed)
     else:
         raise NotImplementedError(f"{identifier} does not exist")
 
     del train_init_rng
 
     return train_ds
+
+
+def _random_subset(rng, X, y, percent: float):
+    if percent == 1.0:
+        return X, y
+
+    n = int(len(y) * percent)
+    ind = rng.integers(0, len(y), n)
+
+    return X[ind, :], y[ind]

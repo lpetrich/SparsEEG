@@ -1,3 +1,5 @@
+from functools import partial
+from typing import Callable
 from flax import struct
 from jax import jit, grad
 from flax.training import train_state
@@ -45,16 +47,17 @@ def create(module, rng, metrics_type, dummy_input, opt):
     )
 
 
-@jit
-def step(state, batch):
-    # TODO: Eventually, we want to factor loss_fn out
-    def loss_fn(params):
+# @jit
+@partial(jit, static_argnames=("loss_fn"))
+def step(state, batch, loss_fn):
+    def _loss_fn(params):
         logits = state.apply_fn({'params': params}, batch['inputs'])
-        loss = optax.softmax_cross_entropy_with_integer_labels(
+        loss = loss_fn(
             logits=logits, labels=batch['labels']
-        ).mean()
+        )
+        loss = loss.mean()
         return loss
-    grad_fn = grad(loss_fn)
+    grad_fn = grad(_loss_fn)
     grads = grad_fn(state.params)
     state = state.apply_gradients(grads=grads)
     return state

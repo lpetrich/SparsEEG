@@ -1,0 +1,38 @@
+train_percent: 0.8
+valid_percent: 0.1
+weighted_loss: true
+epochs: 500
+seed: [0, 1, 2]
+save_dir: "set_500epochs_9subject_weighted"
+dataset:
+  type: "WAYEEGGALDataset-Low"
+  batch_size: [8192]
+  shuffle: true
+  n_subjects: 9
+model:
+  type: "DenseMLP"
+  hidden_layers: [[1024, 1024]]
+  activations: [["relu", "relu"]]
+  optim:
+    type: "set"
+    args: [[]]
+    kwargs:
+      drop_fraction_fn: [
+        "lambda _: 0.15",
+        "lambda _: 0.3",
+      ] # Number of weights to prune at iter i
+      scheduler:
+        type: "PeriodicSchedule"
+        args: []
+        kwargs:
+          update_freq: [1, 2, 5] # epochs
+          update_start_step: 0
+          update_end_step: null
+      sparsity_distribution_fn:
+        type: "erk"
+        kwargs: [{"sparsity": 0.25}, {"sparsity": 0.5}] # Level of sparsity
+    wrapped:
+      type: "adam"
+      args: [[]]
+      kwargs:
+        learning_rate: [0.001]

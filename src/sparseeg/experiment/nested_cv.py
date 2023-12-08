@@ -45,9 +45,12 @@ class Metrics(training_state.MetricsCollection):
 
 
 @jit
-def compute_metrics(*, state, batch):
+def compute_metrics(*, state, batch, loss_fn):
     logits = state.apply_fn({'params': state.params}, batch['inputs'])
-    loss = optax.softmax_cross_entropy_with_integer_labels(
+    # loss = optax.softmax_cross_entropy_with_integer_labels(
+    #     logits=logits, labels=batch['labels']
+    # ).mean()
+    loss = loss_fn(
         logits=logits, labels=batch['labels']
     ).mean()
     labels = jnp.array(batch["labels"], dtype=jnp.int32)
