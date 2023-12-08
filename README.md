@@ -13,7 +13,7 @@ use sparse neural networks in a brain-computer interface system.
 
 Make sure you have Python3 installed:
 
-**1. Clone the repository and `cd` into it
+**1. Clone the repository and `cd` into it**
 ```bash
 git clone git@github.com:lpetrich/SparsEEG.git
 cd SparsEEG
