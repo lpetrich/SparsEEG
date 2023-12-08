@@ -1,15 +1,3 @@
-%% # **<project>**
-
-%% This is the code for our course project in CMPUT 624 Fall 2023.
-
-%% <p align="center">
-%%   <img src="assets/myproject.png" alt="General illustration of the project" width="60%"/>
-%% </p>
-
-%% # Why SparsEEG?
-
-%% What is the initial motivation of this project ?
-
 ## Objective of the project
 
 The goal of this project is to evaluate how sparse neural networks perform on a
@@ -74,7 +62,7 @@ default, this is `./results`.
 
 A very simplified example configuration file is:
 
-```json
+```
 {
 train_percent: [0.8]
 valid_percent: 0.1
