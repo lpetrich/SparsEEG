@@ -1,4 +1,0 @@
-black
-pydocstyle
-mypy
-isort
