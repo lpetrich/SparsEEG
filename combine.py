@@ -19,8 +19,9 @@ import fnmatch
 @click.command()
 def combine(dir, config, filename, force, ignore):
     ignore = ignore.split(",")
-    fpath = "./src/sparseeg/config"
-    config_path = os.path.join(fpath, config)
+    # fpath = "./src/sparseeg/config"
+    # config_path = os.path.join(fpath, config)
+    config_path = config
     if not os.path.exists(config_path):
         raise Exception(f"Config file does not exist: {config_path}")
 

@@ -88,6 +88,22 @@ def plot(data_files):
             h = hyper.best(perfs, np.mean)
             best_hypers.append(h)
 
+            print(p)
+            if "set" in data_file:
+                kwargs = new_data[str(h)]["config"]["model"]["optim"]["kwargs"]
+                print("\t", kwargs["drop_fraction_fn"])
+                print("\t", kwargs["scheduler"]["kwargs"]["update_freq"])
+                print("\t", kwargs["sparsity_distribution_fn"]["kwargs"])
+                kwargs = new_data[str(h)]["config"]["model"]["optim"]
+                print("\t", kwargs["wrapped"]["kwargs"]["learning_rate"])
+            if "weight_pruning" in data_file:
+                kwargs = new_data[str(h)]["config"]["model"]["optim"]["kwargs"]
+                print("\t", kwargs["scheduler"]["args"])
+                print("\t", kwargs["sparsity_distribution_fn"]["kwargs"])
+                kwargs = new_data[str(h)]["config"]["model"]["optim"]
+                print("\t", kwargs["wrapped"]["kwargs"]["learning_rate"])
+
+
             test_accuracy = hyper.get(
                 new_data, h, "test_accuracy", combined=True,
             )

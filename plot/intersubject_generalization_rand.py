@@ -52,7 +52,9 @@ for seed in range(30):
     predictions = []
     for x_batch, y_batch in dl:
         rng = np.random.default_rng(seed=seed)
-        pred = rng.integers(0, 4, y_batch.shape[0])
+        # pred = rng.integers(0, 4, y_batch.shape[0])
+        print(y_batch, y_batch.shape)
+        pred = rng.choice(y_batch, size=len(ds))
         labels.extend(y_batch)
         predictions.extend(pred)
 

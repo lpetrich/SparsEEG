@@ -73,7 +73,8 @@ def plot(data_files, plot_title, smooth_over, skip):
             ds = data["0"]["data"][seed]["dataset"]["test"]
             rng = np.random.default_rng(seed=j + 3)
             y_labels = ds[1]
-            pred = rng.integers(0, 4, y_labels.shape[0])
+            # pred = rng.integers(0, 4, y_labels.shape[0])
+            pred = rng.choice(y_labels, size=y_labels.shape[0])
             acc = sum(pred == y_labels) / len(y_labels)
             random_acc.append(acc)
         random_acc = np.array(random_acc)

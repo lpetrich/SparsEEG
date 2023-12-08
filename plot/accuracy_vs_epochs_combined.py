@@ -71,8 +71,8 @@ def plot(data_files, plot_title, smooth_over, skip):
             plot_data = plot_data[::skip, :, :]
         plot_data = smooth(plot_data, smooth_over)
 
-        if "dense" in data_file:
-            plot_data = plot_data[::5, :]
+        # if "dense" in data_file:
+        #     plot_data = plot_data[::5, :]
 
         n_classes = plot_data.shape[1]
 
@@ -96,9 +96,12 @@ def plot(data_files, plot_title, smooth_over, skip):
             ci[1].append(conf.upper_bound)
         ci = np.array(ci)
 
+        print("Accuracy 95% Bootstrap CI for Final Learned Model")
+        print(ci[:, -1])
+
         ax.plot(
             x_values[:, 1], mean_plot_data, label=labels[i],
-            color=colours[i],
+            color=colours[i], linewidth=3,
         )
         # ax.fill_between(
         #     x_values[:, 1],
@@ -114,7 +117,7 @@ def plot(data_files, plot_title, smooth_over, skip):
     # ax.get_legend().remove()
 
     ax.set_xlim(1, 100)
-    ax.set_ylim((0.2, 1.2))
+    ax.set_ylim((0.2, 1.0))
     # ax.set_xlim((0, n_readings))
     ax.set_ylabel("Accuracy", fontsize=24)
     ax.set_xlabel("Epochs", fontsize=24)
@@ -124,7 +127,7 @@ def plot(data_files, plot_title, smooth_over, skip):
         labels=[0.2, 0.4, 0.6, 0.8, 1.0],
         fontsize=16,
     )
-    ax.set_title("")
+    ax.set_title(plot_title, fontsize=22)
 
     # ax.set_yticks(())
     # ax.set_ylabel("  ")
