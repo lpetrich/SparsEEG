@@ -1,8 +1,15 @@
-## Objective of the project
+# The SparsEEG Project
 
 The goal of this project is to evaluate how sparse neural networks perform on a
-classification task using EEG data. The goal is to better understand how we can
-use sparse neural networks in a brain-computer interface system.
+classification task using EEG data. This is towards better understanding how 
+sparsifying the network can help to reduce computational and memory requirements
+while maintaining performance accuracy in a brain-computer interface system.
+
+This repository was developed as a part of our final course project for 
+CMPUT 624: Machine Learning and the Brain at the University of Alberta.
+
+[Link to our corresponding project report.](www.google.ca)
+
 
 # Table of Contents
 
@@ -32,7 +39,7 @@ pip install -e .
 ```
 
 **4. Download the dataset files and unzip into `src/sparseeg`:**
-https://drive.google.com/file/d/1f49lJ2fuja27wC-ze8o6CC3O1ENMzbMJ/view?usp=share_link
+[Dataset download link](https://drive.google.com/file/d/1f49lJ2fuja27wC-ze8o6CC3O1ENMzbMJ/view?usp=share_link)
 
 
 # Usage
