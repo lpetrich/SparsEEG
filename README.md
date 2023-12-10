@@ -24,10 +24,14 @@ cd SparsEEG
 ```bash
 pip install --upgrade pip
 pip install -r requirements.txt
+```
+
+**3. Install SparsEEG package in edit mode:**
+```bash
 pip install -e .
 ```
 
-**3. Download the dataset files and unzip into `src/sparseeg`:**
+**4. Download the dataset files and unzip into `src/sparseeg`:**
 https://drive.google.com/file/d/1f49lJ2fuja27wC-ze8o6CC3O1ENMzbMJ/view?usp=share_link
 
 
