@@ -6,7 +6,7 @@ sparsifying the network can help to reduce computational and memory requirements
 while maintaining performance accuracy in a brain-computer interface system.
 
 This repository was developed as a part of our final course project for 
-CMPUT 624: Machine Learning and the Brain at the University of Alberta. [Link to our corresponding project report.](www.google.ca)
+CMPUT 624: Machine Learning and the Brain at the University of Alberta. [Link to our corresponding project report.](https://github.com/lpetrich/SparsEEG/blob/main/CMPUT624-Project-Report-Samuel-Laura.pdf)
 
 
 # Table of Contents
