@@ -5,7 +5,7 @@ classification task using EEG data. This is towards better understanding how
 sparsifying the network can help to reduce computational and memory requirements
 while maintaining performance accuracy in a brain-computer interface system.
 
-This repository contains all the code for our submitted BioRob 2024 paper: [Neural Network Sparsity for Computationally Efficient Electroencephalography Control.](https://github.com/lpetrich/SparsEEG/blob/main/CMPUT624-Project-Report-Samuel-Laura.pdf)
+This repository contains all the code for our submitted BioRob 2024 paper: Neural Network Sparsity for Computationally Efficient Electroencephalography Control
 
 
 # Table of Contents
